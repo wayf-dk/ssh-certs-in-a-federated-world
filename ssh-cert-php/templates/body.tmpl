@@ -35,7 +35,7 @@ setCurl()
 
 function setCurl() {
     const key = 'id_ed25519'
-    let curl = 'curl -s %u/%t -F pub="<$HOME/.ssh/%p.pub"  -o "$HOME/.ssh/%p-cert.pub"'
+    let curl = 'curl -sk %u/%t -F pub="<$HOME/.ssh/%p.pub"  -o "$HOME/.ssh/%p-cert.pub"'
     const t = '<?= $sessionId ?>'
     curl = curl.replaceAll('%t', t )
     curl = curl.replaceAll('%p', key)

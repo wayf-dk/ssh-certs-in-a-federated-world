@@ -11,8 +11,7 @@ class jwt2passwd {
         error_log(print_r($attrs, 1));
 
         $username = $cert['valid principals'][0]; // for now - Key ID in the future
-        $attrs['memberOf'] = [$username, 'abc', 'def', 'zzz'];
-        //$attrs['isMemberOf'][] = $username;
+        $attrs['memberOf'][] = $username;
 
         // try to add user - will fail if already registered - we just ignore that
         $res = `/usr/sbin/adduser $username`;

@@ -1,5 +1,5 @@
 <?php
-set_include_path(dirname(__DIR__)."/templates");
+set_include_path(__DIR__."/templates");
 $path = array_values(array_filter(preg_split("/[\/?]/", $_SERVER['REQUEST_URI'] ?? ''), function ($e) { return $e; })); // get rid of falsy elements
 //var_dump('<pre>', $_SERVER, $path); exit;
 [$do, $scope] = $path + [null, null];
@@ -20,12 +20,17 @@ switch ($do) {
         if (!$loggedIn || $do == "login") {
             $_SESSION = [];
             session_regenerate_id();
-            $attrs = saml2jwt::jwtauth([$scope]);
+            //$attrs = saml2jwt::jwtauth([$scope]);
+            $attrs = [
+                'eduPersonPrincipalName' => ['user2@sshca.lan'],
+                'memberOf' => ['group1', 'group-x'],
+            ];
+
             preg_match('/^.+@([^@]+)/', $attrs['eduPersonPrincipalName'][0], $d);
             [$eppn, $scope] = $d;
             $_SESSION['principals'] = [preg_replace("/[^-a-z0-9]/", "_", $eppn)];
             $_SESSION['attrs'] = $attrs;
-            header("Location: https://ssh-cert.dgw.deic.dk/show/$scope");
+            header("Location: https://sshca.lan/show/$scope");
             exit;
         }
         $sessionId = session_id();
@@ -34,13 +39,23 @@ switch ($do) {
 }
 
 function genCert($pubKey) {
-    $principals = join(",", [$_SESSION['principals']]);
-    $privatekey = dirname(__DIR__)."/keys/ssh-cert-1.key";
+    $attrs = [
+        'eduPersonPrincipalName' => ['user2@sshca.lan'],
+        'memberOf' => ['group1', 'group-y'],
+    ];
+
+    preg_match('/^.+@([^@]+)/', $attrs['eduPersonPrincipalName'][0], $d);
+    [$eppn, $scope] = $d;
+    $_SESSION['principals'] = [preg_replace("/[^-a-z0-9]/", "_", $eppn)];
+    $_SESSION['attrs'] = $attrs;
+
+    $principals = join(",", $_SESSION['principals']);
+    $keyID = $_SESSION['principals'][0];
+    $privatekey = __DIR__."/ssh-ca-key";
     $pubfile = tempnam("/tmp", "pub-");
     file_put_contents($pubfile, $pubKey);
     $certfile = "$pubfile-cert.pub";
     $attrs = $_SESSION['attrs'];
-    $attrs['memberOf'] = ['abc'];
     $jsonattrs = json_encode($attrs);
     // -O 'critical:force-command=/usr/bin/echo hi'
     $out = `ssh-keygen -q -O 'extension:groups@wayf.dk=$jsonattrs' -s '$privatekey' -n '$principals' -I '$eppn' -V -1d:+1d $pubfile 2>&1`;
