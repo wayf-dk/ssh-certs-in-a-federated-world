@@ -2,7 +2,7 @@
 <H2>DeiC SSH Certificate Authority [PILOT]</h2>
 <p>The DEiC SSH Certificate Authority creates SSH certificates based on a federated login.
 <p>The public key for the certificate authority is:
-<p><code id=certpublickey>ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK3wXr15C6RcqNNUhfhAuQMYulraaD5CPs1ogDr1+BcZ</code> <button class=copy data-target=certpublickey></button>
+<p><code id=certpublickey>ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJoDNr0ec0yRaDdr7NhQtJkaNNPF+QQkeINOFYlPaT0b</code> <button class=copy data-target=certpublickey></button>
 </section>
 <section>
 <p>Hello <em><?= $_SESSION['principals'][0]; ?></em>
@@ -13,12 +13,12 @@
 
 <p>The command below is already copied to your clipboard. Execute it in a shell to upload the public key and download the SSH certificate.
 <p><code id=curl></code> <button class=copy data-target=curl></button>
-<p>Then copy the command below and excecute it in a shell:
+<p>For your first login copy the command below and excecute it in a shell:
 <p><code id=sshcmd></code> <button class=copy data-target=sshcmd></button>
+<p>For subsequent logins copy the command below and excecute it in a shell:
 <p><code id=sshcmd2></code> <button class=copy data-target=sshcmd2></button>
-<p>You will not get access to a shell but see: <code>This account is currently not available.</code> if the authentication based on the certificate succeded.
-<p>If you see <code>cert-tester@wayf-test.risoe.dk: Permission denied (...)</code> the authentication failed.
-<p>You can use <code id=sshkeygen>ssh-keygen -Lf .ssh/&lt;privat nøgle navn&gt;-cert.pub</code> <button class=copy data-target=sshkeygen></button> to see if the certificate is expired.
+<p>You can use <code id=sshkeygen>ssh-keygen -Lf .ssh/&lt;privat nøgle navn&gt;-cert.pub</code> <button class=copy data-target=sshkeygen></button> to see if the contents of the
+certificate - e.g. if it is expired.
 <pre id=cert></pre>
 </section>
 
@@ -44,7 +44,7 @@ function setCurl() {
     document.querySelector('#curl').innerText = curl
     const sshkeygen = `ssh-keygen -Lf "$HOME/.ssh/${key}-cert.pub"`
     document.querySelector("#sshkeygen").innerText = sshkeygen
-    const sshcmd = `ssh -i "$HOME/.ssh/${key}" cert-tester@join-dtu.risoe.dk`
+    const sshcmd = `ssh -i "$HOME/.ssh/${key}" nobody@test-arken.test.lan`
     document.querySelector("#sshcmd").innerText = sshcmd
     const sshcmd2 = `ssh -i "$HOME/.ssh/${key}" <?= $_SESSION['principals'][0] ?>@test-arken.test.lan`
     document.querySelector("#sshcmd2").innerText = sshcmd2

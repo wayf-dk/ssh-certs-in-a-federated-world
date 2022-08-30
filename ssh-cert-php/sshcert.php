@@ -3,6 +3,7 @@ set_include_path(__DIR__."/templates");
 $path = array_values(array_filter(preg_split("/[\/?]/", $_SERVER['REQUEST_URI'] ?? ''), function ($e) { return $e; })); // get rid of falsy elements
 //var_dump('<pre>', $_SERVER, $path); exit;
 [$do, $scope] = $path + [null, null];
+
 switch ($do) {
     case "getc":
         $token = $scope;
@@ -20,16 +21,22 @@ switch ($do) {
         if (!$loggedIn || $do == "login") {
             $_SESSION = [];
             session_regenerate_id();
-            //$attrs = saml2jwt::jwtauth([$scope]);
             $attrs = [
                 'eduPersonPrincipalName' => ['user2@sshca.lan'],
-                'memberOf' => ['group1', 'group-x'],
+                'memberOf' => ['group1', 'group-y'],
             ];
 
             preg_match('/^.+@([^@]+)/', $attrs['eduPersonPrincipalName'][0], $d);
             [$eppn, $scope] = $d;
             $_SESSION['principals'] = [preg_replace("/[^-a-z0-9]/", "_", $eppn)];
             $_SESSION['attrs'] = $attrs;
+/*
+            $attrs = saml2jwt::jwtauth([$scope]);
+            preg_match('/^.+@([^@]+)/', $attrs['eduPersonPrincipalName'][0], $d);
+            [$eppn, $scope] = $d;
+            $_SESSION['principals'] = [preg_replace("/[^-a-z0-9]/", "_", $eppn)];
+            $_SESSION['attrs'] = $attrs;
+*/
             header("Location: https://sshca.lan/show/$scope");
             exit;
         }
@@ -41,7 +48,7 @@ switch ($do) {
 function genCert($pubKey) {
     $attrs = [
         'eduPersonPrincipalName' => ['user2@sshca.lan'],
-        'memberOf' => ['group1', 'group-y'],
+        'memberOf' => ['group1', 'group-xxx'],
     ];
 
     preg_match('/^.+@([^@]+)/', $attrs['eduPersonPrincipalName'][0], $d);
