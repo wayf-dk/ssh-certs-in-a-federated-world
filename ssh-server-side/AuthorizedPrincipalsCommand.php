@@ -13,8 +13,6 @@ $certusername = jwt2passwd::updateUserAndGroup($decodedCertificate);
 
 error_log("username: $username");
 
-if ($certusername === $username) {
     print <<<eop
-$username
+$certusername
 eop;
-}

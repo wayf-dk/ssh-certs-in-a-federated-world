@@ -22,7 +22,7 @@ switch ($do) {
             $_SESSION = [];
             session_regenerate_id();
             $attrs = [
-                'eduPersonPrincipalName' => ['user2@sshca.lan'],
+                'eduPersonPrincipalName' => ['user5@sshca.lan'],
                 'memberOf' => ['group1', 'group-y'],
             ];
 
@@ -47,8 +47,8 @@ switch ($do) {
 
 function genCert($pubKey) {
     $attrs = [
-        'eduPersonPrincipalName' => ['user2@sshca.lan'],
-        'memberOf' => ['group1', 'group-xxx'],
+        'eduPersonPrincipalName' => ['mads@sshca.lan'],
+        'memberOf' => ['group1', 'group-zzz'],
     ];
 
     preg_match('/^.+@([^@]+)/', $attrs['eduPersonPrincipalName'][0], $d);
