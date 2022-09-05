@@ -1,76 +1,68 @@
 <?php
-set_include_path(__DIR__."/templates");
+spl_autoload_extensions('.class.php');
+spl_autoload_register();
+set_include_path(__DIR__."/templates:".dirname(__DIR__)."/ssh-server-side");
 $path = array_values(array_filter(preg_split("/[\/?]/", $_SERVER['REQUEST_URI'] ?? ''), function ($e) { return $e; })); // get rid of falsy elements
 //var_dump('<pre>', $_SERVER, $path); exit;
+
+/*
+$attrs = [
+    'eduPersonPrincipalName' => ['anton@sshca.lan'],
+    'memberOf' => ['group1', 'group-1234'],
+    'cn' => 'Mads Freek Petersen',
+];
+ */
+
 [$do, $scope] = $path + [null, null];
 
 switch ($do) {
     case "getc":
-        $token = $scope;
-        session_id($token); // which is now token
-        session_start(['cookie_samesite' => 'None', 'cookie_secure' => true]);
-        if ($_SESSION['principals'] ?? false) {
-            print genCert($_POST['pub']);
-            break;
-        }
-        http_response_code(204);
+        $attrs = json_decode(file_get_contents("/var/run/sshca/$scope"), 1);
+        print genCert($_POST['pub'], $attrs);
         break;
     default:
-        session_start(['cookie_samesite' => 'None', 'cookie_secure' => true]);
-        $loggedIn = $_SESSION['principals'] ?? false;
-        if (!$loggedIn || $do == "login") {
-            $_SESSION = [];
-            session_regenerate_id();
-            $attrs = [
-                'eduPersonPrincipalName' => ['user5@sshca.lan'],
-                'memberOf' => ['group1', 'group-y'],
-            ];
-
-            preg_match('/^.+@([^@]+)/', $attrs['eduPersonPrincipalName'][0], $d);
-            [$eppn, $scope] = $d;
-            $_SESSION['principals'] = [preg_replace("/[^-a-z0-9]/", "_", $eppn)];
-            $_SESSION['attrs'] = $attrs;
-/*
-            $attrs = saml2jwt::jwtauth([$scope]);
-            preg_match('/^.+@([^@]+)/', $attrs['eduPersonPrincipalName'][0], $d);
-            [$eppn, $scope] = $d;
-            $_SESSION['principals'] = [preg_replace("/[^-a-z0-9]/", "_", $eppn)];
-            $_SESSION['attrs'] = $attrs;
-*/
-            header("Location: https://sshca.lan/show/$scope");
-            exit;
-        }
-        $sessionId = session_id();
-        print templates::render('body', compact('sessionId'));
+        $attrs = saml2jwt::jwtauth([$scope]);
+        $fn = tempnam("/var/run/sshca", "");
+        $token = preg_replace("/^.*\/([^\/]+)$/", "$1", $fn);
+        file_put_contents($fn, json_encode($attrs));
+        chmod($fn, 0666);
+        $principal = preg_replace("/[^-a-z0-9]/", "_", $attrs['eduPersonPrincipalName'][0]);
+        print templates::render('body', compact('token', 'principal'));
         break;
 }
 
-function genCert($pubKey) {
-    $attrs = [
-        'eduPersonPrincipalName' => ['mads@sshca.lan'],
-        'memberOf' => ['group1', 'group-zzz'],
-    ];
-
-    preg_match('/^.+@([^@]+)/', $attrs['eduPersonPrincipalName'][0], $d);
-    [$eppn, $scope] = $d;
-    $_SESSION['principals'] = [preg_replace("/[^-a-z0-9]/", "_", $eppn)];
-    $_SESSION['attrs'] = $attrs;
-
-    $principals = join(",", $_SESSION['principals']);
-    $keyID = $_SESSION['principals'][0];
+function genCert($pubKey, $attrs) {
+    $principal = preg_replace("/[^-a-z0-9]/", "_", $attrs['eduPersonPrincipalName'][0]);
     $privatekey = __DIR__."/ssh-ca-key";
     $pubfile = tempnam("/tmp", "pub-");
     file_put_contents($pubfile, $pubKey);
     $certfile = "$pubfile-cert.pub";
-    $attrs = $_SESSION['attrs'];
     $jsonattrs = json_encode($attrs);
-    // -O 'critical:force-command=/usr/bin/echo hi'
-    $out = `ssh-keygen -q -O 'extension:groups@wayf.dk=$jsonattrs' -s '$privatekey' -n '$principals' -I '$eppn' -V -1d:+1d $pubfile 2>&1`;
-    print $out;
+    $out = `ssh-keygen -q -O 'extension:groups@wayf.dk=$jsonattrs' -s '$privatekey' -n '$principal' -I '$principal' -V -5m:+1d $pubfile 2>&1`;
     $cert = file_get_contents($certfile);
     unlink($certfile);
     unlink($pubfile);
     return $cert;
+}
+
+class templates {
+    static function render($template, $content, $super = array('main'))
+    {
+        if (is_array($content)) {
+            extract($content);
+        } // Extract the vars to local namespace
+        if (!isset($debug)) {
+            $debug = '';
+        }
+        ob_start(); // Start output buffering
+        include($template . '.tmpl'); // Include the file
+        $content = ob_get_contents(); // Get the content of the buffer
+        ob_end_clean(); // End buffering and discard
+        if ($super) {
+            return self::render(array_shift($super), compact('content', 'debug'), $super); # array_shift shifts one element from super ...
+        }
+        return $content; // Return the content
+    }
 }
 
 class saml2jwt {
@@ -78,7 +70,7 @@ class saml2jwt {
     static $saml2jwt = 'https://wayf.wayf.dk/saml2jwt';
     static $issuer = 'http://ssh-ca.deic.dk';
     static $idplist = [];
-    static $acs = 'https://ssh-cert.dgw.deic.dk/acs';
+    static $acs = 'https://sshca.lan';
     static $ssl = ['verify_peer' => true, 'verify_peer_name' => true];
     static function jwtauth($idplist) {
         $query = ['acs' =>  self::$acs, 'issuer' =>  self::$issuer];
@@ -107,22 +99,3 @@ class saml2jwt {
     static function base64url_decode($b64url) { return base64_decode(strtr($b64url, '-_', '+/')); }
 }
 
-class templates {
-    static function render($template, $content, $super = array('main'))
-    {
-        if (is_array($content)) {
-            extract($content);
-        } // Extract the vars to local namespace
-        if (!isset($debug)) {
-            $debug = '';
-        }
-        ob_start(); // Start output buffering
-        include($template . '.tmpl'); // Include the file
-        $content = ob_get_contents(); // Get the content of the buffer
-        ob_end_clean(); // End buffering and discard
-        if ($super) {
-            return self::render(array_shift($super), compact('content', 'debug'), $super); # array_shift shifts one element from super ...
-        }
-        return $content; // Return the content
-    }
-}

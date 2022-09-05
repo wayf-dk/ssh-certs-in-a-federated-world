@@ -5,10 +5,11 @@
 <p><code id=certpublickey>ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJoDNr0ec0yRaDdr7NhQtJkaNNPF+QQkeINOFYlPaT0b</code> <button class=copy data-target=certpublickey></button>
 </section>
 <section>
-<p>Hello <em><?= $_SESSION['principals'][0]; ?></em>
+<p>Hello <em><?= $principal ?></em>
 </section>
 <section>
 
+<h2>SSH login</h2>
 <p>For this POC the CA will use the public key <em>$HOME/.ssh/id_ed25519.pub</em> and create a SSH certificate <em>$HOME/.ssh/id_ed25519-cert.pub</em>. The SSH certificate will be valid for 24 hours.
 
 <p>The command below is already copied to your clipboard. Execute it in a shell to upload the public key and download the SSH certificate.
@@ -19,6 +20,12 @@
 <p><code id=sshcmd2></code> <button class=copy data-target=sshcmd2></button>
 <p>You can use <code id=sshkeygen>ssh-keygen -Lf .ssh/&lt;privat nøgle navn&gt;-cert.pub</code> <button class=copy data-target=sshkeygen></button> to see if the contents of the
 certificate - e.g. if it is expired.
+<h2>SSH-based weblogin login</h2>
+<button onclick="setCurl(1);">Weblogin</button>
+<p><code id=weblogin></code> <button class=copy data-target=weblogin></button>
+</section>
+<section>
+<h2>Installed certificate</h2>
 <pre id=cert></pre>
 </section>
 
@@ -26,34 +33,43 @@ certificate - e.g. if it is expired.
 
 const buttons = document.querySelectorAll('button.copy')
 buttons.forEach(b => b.addEventListener('click', e => {
-    const cp = document.querySelector(`#${e.target.dataset.target}`).innerText
-    navigator.clipboard.writeText(cp).then()
+    const cp = document.querySelector(`#${e.target.dataset.target}`)
+    navigator.clipboard.writeText(cp.innerText).then()
+
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+
+    const range = document.createRange();
+    range.selectNodeContents(cp);
+    selection.addRange(range);
 })
 )
 
-setCurl()
+setCurl(false)
 
-function setCurl() {
-    const key = 'id_ed25519'
-    let curl = 'curl -sk %u/%t -F pub="<$HOME/.ssh/%p.pub"  -o "$HOME/.ssh/%p-cert.pub"'
-    const t = '<?= $sessionId ?>'
-    curl = curl.replaceAll('%t', t )
-    curl = curl.replaceAll('%p', key)
+function setCurl(weblogin) {
+    const key = '$HOME/.ssh/id_ed25519'
+    const cmd = 'ssh sshweblogin@test-arken.test.lan'
+    const t = '<?= $token ?>'
     const l = window.location
-    curl = curl.replaceAll('%u', `${l.protocol}//${l.host}/getc`)
+    let curl = `curl -sk ${l.protocol}//${l.host}/getc/${t} -F pub="<${key}.pub"  -o "${key}-cert.pub"`
     document.querySelector('#curl').innerText = curl
-    const sshkeygen = `ssh-keygen -Lf "$HOME/.ssh/${key}-cert.pub"`
+    document.querySelector('#weblogin').innerText = curl + `;open \`${cmd}\``
+    const sshkeygen = `ssh-keygen -Lf "${key}-cert.pub"`
     document.querySelector("#sshkeygen").innerText = sshkeygen
-    const sshcmd = `ssh -i "$HOME/.ssh/${key}" nobody@test-arken.test.lan`
+    const sshcmd = `ssh sshfedlogin@test-arken.test.lan`
     document.querySelector("#sshcmd").innerText = sshcmd
-    const sshcmd2 = `ssh -i "$HOME/.ssh/${key}" <?= $_SESSION['principals'][0] ?>@test-arken.test.lan`
+    const sshcmd2 = `ssh <?= $principal?>@test-arken.test.lan`
     document.querySelector("#sshcmd2").innerText = sshcmd2
     navigator.clipboard.writeText(curl).then()
-    const href = `http://127.0.0.1:7780?token=${t}`
-    document.querySelector("a#localhost").href = href
-
-    fetch(href)
-        .then(response => response.text())
-        .then(data => document.querySelector('#cert').innerText = data)
+    const href = `http://127.0.0.1:7780?url=${encodeURIComponent(curl)}`
+    if (weblogin) {
+        window.location = `http://127.0.0.1:7780?cmd=${encodeURIComponent(cmd)}`
+    } else {
+        fetch(href)
+            .then(response => response.text())
+            .then(data => document.querySelector('#cert').innerText = data)
+    }
+    return false;
 }
 </script>
