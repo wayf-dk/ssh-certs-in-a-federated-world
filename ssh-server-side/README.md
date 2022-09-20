@@ -11,9 +11,14 @@ TrustedUserCAKeys /srv/dev/ssh-certs-in-a-federated-world/ssh-server-side/ssh-ca
 AuthorizedPrincipalsCommandUser root
 AuthorizedPrincipalsCommand /usr/bin/php /srv/dev/ssh-certs-in-a-federated-world/ssh-server-side/AuthorizedPrincipalsCommand.php %u %k %t
 ExposeAuthInfo yes
+AuthorizedKeysFile none
 ```
 
 Remember to restart sshd
+
+mkdir /var/run/sshca
+chmod o+w /var/run/sshweblogin
+
 
 ## Special users
 
@@ -23,9 +28,14 @@ For initial login
 
 `adduser --disabled-password --shell /srv/dev/ssh-certs-in-a-federated-world/ssh-server-side/sshfedloginshell.php sshweblogin`
 
-touch /home/sshweblogin/.hushlogin
 
 ## For Weblogin
 
-mkdir /var/run/sshweblogin
-chmod o+w /var/run/sshweblogin
+
+touch /home/sshweblogin/.hushlogin
+
+
+```
+AuthorizedKeysCommandUser root
+AuthorizedKeysCommand /usr/bin/php /srv/dev/ssh-certs-in-a-federated-world/ssh-server-side/AuthorizedKeysCommand.php %u %k %t
+```

@@ -6,43 +6,37 @@ $path = array_values(array_filter(preg_split("/[\/?]/", $_SERVER['REQUEST_URI'] 
 //var_dump('<pre>', $_SERVER, $path); exit;
 
 /*
-$attrs = [
-    'eduPersonPrincipalName' => ['anton@sshca.lan'],
-    'memberOf' => ['group1', 'group-1234'],
-    'cn' => 'Mads Freek Petersen',
-];
- */
+    hengill
+    hromundartindur
+    blafjoll
+    krisuvik
+    reykjanes
+    svartsengi
+    eldey
+*/
+
+class demo {
+    static $attrs = [
+        'eduPersonPrincipalName' => ['eldey@sshca.lan'],
+        'isMemberOf' => ['group-1', 'group-2', 'group-3', 'group-44'],
+    ];
+}
 
 [$do, $scope] = $path + [null, null];
 
 switch ($do) {
-    case "getc":
-        $attrs = json_decode(file_get_contents("/var/run/sshca/$scope"), 1);
-        print genCert($_POST['pub'], $attrs);
-        break;
+    case "favicon.ico":
+        exit;
     default:
-        $attrs = saml2jwt::jwtauth([$scope]);
+        $attrs = demo::$attrs;
+        //$attrs = saml2jwt::jwtauth([$scope]);
         $fn = tempnam("/var/run/sshca", "");
-        $token = preg_replace("/^.*\/([^\/]+)$/", "$1", $fn);
         file_put_contents($fn, json_encode($attrs));
         chmod($fn, 0666);
+        $token = array_reverse(explode("/", $fn))[0];
         $principal = preg_replace("/[^-a-z0-9]/", "_", $attrs['eduPersonPrincipalName'][0]);
         print templates::render('body', compact('token', 'principal'));
-        break;
-}
-
-function genCert($pubKey, $attrs) {
-    $principal = preg_replace("/[^-a-z0-9]/", "_", $attrs['eduPersonPrincipalName'][0]);
-    $privatekey = __DIR__."/ssh-ca-key";
-    $pubfile = tempnam("/tmp", "pub-");
-    file_put_contents($pubfile, $pubKey);
-    $certfile = "$pubfile-cert.pub";
-    $jsonattrs = json_encode($attrs);
-    $out = `ssh-keygen -q -O 'extension:groups@wayf.dk=$jsonattrs' -s '$privatekey' -n '$principal' -I '$principal' -V -5m:+1d $pubfile 2>&1`;
-    $cert = file_get_contents($certfile);
-    unlink($certfile);
-    unlink($pubfile);
-    return $cert;
+        exit;
 }
 
 class templates {

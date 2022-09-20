@@ -53,7 +53,7 @@ class sshCert {
         self::$fields["ecdsa-sha2-nistp384-cert-v01@openssh.com"] = self::$fields["ecdsa-sha2-nistp256-cert-v01@openssh.com"];
         self::$fields["ecdsa-sha2-nistp521-cert-v01@openssh.com"] = self::$fields["ecdsa-sha2-nistp256-cert-v01@openssh.com"];
 
-        $cert = base64_decode($cert);
+        $cert = base64_decode(array_reverse(explode(" ", $cert))[0]);
         [$keyType,, $offset] = self::unpackString($cert, 0);
         $format = self::$fields[$keyType]+self::$fields['common'];
         $res = [];

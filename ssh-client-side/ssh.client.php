@@ -1,7 +1,6 @@
 #!/usr/local/bin/php
 <?php
 
-//`open https://sshca.lan/`;
 $socket = stream_socket_server('tcp://127.0.0.1:7780', $errno, $errstr);
 for (;;) {
     $conn = stream_socket_accept($socket, 3600);

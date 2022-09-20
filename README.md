@@ -23,4 +23,6 @@ Sshd logs the certificate's Key ID and Serial.
 ### Create a user on-the-fly based on information in the certificate
 
 
+###
 
+If you run ssh-add while a certificate is present it will be added to the ssh agent. Ssh will the keep using the certificate from the agent and no

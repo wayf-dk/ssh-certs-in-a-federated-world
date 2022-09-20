@@ -1,5 +1,5 @@
-<section>
-<H2>DeiC SSH Certificate Authority [PILOT]</h2>
+<section class=ssh>
+<H2>DeiC SSH Certificate Authority POC</h2>
 <p>The DEiC SSH Certificate Authority creates SSH certificates based on a federated login.
 <p>The public key for the certificate authority is:
 <p><code id=certpublickey>ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJoDNr0ec0yRaDdr7NhQtJkaNNPF+QQkeINOFYlPaT0b</code> <button class=copy data-target=certpublickey></button>
@@ -7,7 +7,7 @@
 <section>
 <p>Hello <em><?= $principal ?></em>
 </section>
-<section>
+<section class=ssh>
 
 <h2>SSH login</h2>
 <p>For this POC the CA will use the public key <em>$HOME/.ssh/id_ed25519.pub</em> and create a SSH certificate <em>$HOME/.ssh/id_ed25519-cert.pub</em>. The SSH certificate will be valid for 24 hours.
@@ -20,11 +20,13 @@
 <p><code id=sshcmd2></code> <button class=copy data-target=sshcmd2></button>
 <p>You can use <code id=sshkeygen>ssh-keygen -Lf .ssh/&lt;privat nøgle navn&gt;-cert.pub</code> <button class=copy data-target=sshkeygen></button> to see if the contents of the
 certificate - e.g. if it is expired.
-<h2>SSH-based weblogin login</h2>
+</section>
+<section class=web>
+<h2>SSH-based weblogin</h2>
 <button onclick="setCurl(1);">Weblogin</button>
 <p><code id=weblogin></code> <button class=copy data-target=weblogin></button>
 </section>
-<section>
+<section class=ssh>
 <h2>Installed certificate</h2>
 <pre id=cert></pre>
 </section>
@@ -49,19 +51,23 @@ setCurl(false)
 
 function setCurl(weblogin) {
     const key = '$HOME/.ssh/id_ed25519'
-    const cmd = 'ssh sshweblogin@test-arken.test.lan'
-    const t = '<?= $token ?>'
     const l = window.location
-    let curl = `curl -sk ${l.protocol}//${l.host}/getc/${t} -F pub="<${key}.pub"  -o "${key}-cert.pub"`
+    const webtoken = l.host == "sshsp.lan"
+    const cmd = `ssh sshweblogin@sshsp.lan`
+    const t = '<?= $token ?>'
+    const host = 'sshca.lan'
+    //let curl = `curl -sk ${l.protocol}//${host}/getc/${t} -F pub="<${key}.pub"  -o "${key}-cert.pub"`
+    let curl = `ssh -i "${key}.pub" -o IdentitiesOnly=yes sshgencert@${host} ${t} > "${key}-cert.pub"`
     document.querySelector('#curl').innerText = curl
-    document.querySelector('#weblogin').innerText = curl + `;open \`${cmd}\``
+    let webcurl = curl + `;open \`ssh sshweblogin@sshsp.lan\``
+    document.querySelector('#weblogin').innerText = webcurl
     const sshkeygen = `ssh-keygen -Lf "${key}-cert.pub"`
     document.querySelector("#sshkeygen").innerText = sshkeygen
     const sshcmd = `ssh sshfedlogin@test-arken.test.lan`
     document.querySelector("#sshcmd").innerText = sshcmd
     const sshcmd2 = `ssh <?= $principal?>@test-arken.test.lan`
     document.querySelector("#sshcmd2").innerText = sshcmd2
-    navigator.clipboard.writeText(curl).then()
+    navigator.clipboard.writeText(webtoken ? webcurl : curl).then()
     const href = `http://127.0.0.1:7780?url=${encodeURIComponent(curl)}`
     if (weblogin) {
         window.location = `http://127.0.0.1:7780?cmd=${encodeURIComponent(cmd)}`
@@ -70,6 +76,8 @@ function setCurl(weblogin) {
             .then(response => response.text())
             .then(data => document.querySelector('#cert').innerText = data)
     }
+    const klass = {true: 'ssh', false: 'web'}[webtoken == 1]
+    for (let el of document.querySelectorAll(`.${klass}`)) el.style.display = 'none';
     return false;
 }
 </script>

@@ -1,3 +1,4 @@
+#!/usr/bin/php
 <?php
 ini_set('error_log', "/var/log/sshcert.log");
 spl_autoload_extensions('.class.php');
