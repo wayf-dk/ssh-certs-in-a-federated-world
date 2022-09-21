@@ -35,7 +35,7 @@ function genCert($pubKey, $attrs) {
     $pubfile = tempnam("/tmp", "pub-");
     file_put_contents($pubfile, $pubKey);
     $jsonattrs = json_encode($attrs);
-    $out = `ssh-keygen -q  -O 'extension:groups@wayf.dk=$jsonattrs' -s '$privatekey' -n '$principal' -I '$principal' -V +1d $pubfile 2>&1`;
+    $out = `ssh-keygen -q  -O 'extension:xgroups@wayf.dk=$jsonattrs' -s '$privatekey' -n '$principal' -I '$principal' -V +1d $pubfile 2>&1`;
     $certfile = "$pubfile-cert.pub";
     $cert = file_get_contents($certfile);
     unlink($certfile);
