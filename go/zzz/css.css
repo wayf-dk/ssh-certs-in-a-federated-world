@@ -1,0 +1,147 @@
+body
+{
+	font-family: sans-serif;
+	font-size: 14pt;
+}
+
+p, ul { font-size: 100%; }
+li { margin: 10px 2em; }
+p, h3, h4, h5, details { margin: 5px 5px; padding: 0.1em; }
+td { padding: 0.2em 0.5em; }
+.hidden { display: none; }
+
+code {
+    font-size: 80%;
+}
+
+.cardx, .container, section
+{
+	/* Add shadows to create the "card" effect */
+	box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+	transition: 0.3s;
+	border-radius: 5px;
+	margin: 2%;
+	background-color: #F3F4F6;
+	/* #F1F5F9; */
+	padding: 5px;
+	border-left: 4px solid #66b340;
+}
+
+#alert.card
+{
+	background-color: #FEF3C7;
+	color: FBBF24;
+}
+
+button
+{
+	background-color: #66b340;
+	border-radius: 5px;
+	border: none;
+	cursor: pointer;
+	color: #ffffff;
+	font-size: 24px;
+	padding: 5px 20px;
+	margin: 5px 25px 5px 0;
+}
+
+button.mini, button.cancel
+{
+	font-size: 90%;
+	padding: 1px 10px;
+	border-radius: 5px;
+	margin: 5px;
+}
+
+button:hover { background-color: #166534; }
+
+button:active
+{
+	position: relative;
+	top: 1px;
+}
+
+button.ops
+{
+	background-color: white;
+	color: black;
+}
+
+input
+{
+	font-size: 100%;
+	background-color: #E5E7EB;
+	padding: 0 4px;
+}
+
+/* On mouse-over, add a deeper shadow */
+.card:hover { box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2); }
+
+/* Add some padding inside the card container */
+.container { padding: 2px 16px; }
+svg { border: 1px #eee solid; }
+
+table#keylist
+{
+	border: 1px solid #ddd;
+	border-spacing: 4px;
+	border-collapse: collapse;
+	max-width: 100%;
+}
+
+#keylist td
+{
+	border-bottom: 1px solid #ddd;
+	width: 50%;
+	padding: 2px;
+}
+
+#keylist td:nth-child(1)
+{
+	text-align: right;
+	font-weight: bold;
+	padding-right: 25px;
+}
+
+#keylist tr.top td { padding-top: 20px; }
+
+img.clippy
+{
+	width: 13px;
+	background-color: white;
+	border: 0;
+}
+
+img.deic
+{
+	float: left;
+	height: 25px;
+	margin-top: -7;
+	margin-right: 5;
+}
+
+button.mini
+{
+	scale: 80%;
+	padding: 0 5px;
+}
+
+button.copy {
+    background-color: transparent;
+    background-image: url("/www/copy.svg");
+    background-repeat: no-repeat;
+    width: .9em;
+    height: .9em;
+    padding: 0.3em;
+    vertical-align: middle;
+    margin: 0;
+}
+
+details[open] {
+    border: solid black thin;
+}
+
+@media (hover: none) and (pointer: coarse)
+{
+	.remote { display: none; }
+}
