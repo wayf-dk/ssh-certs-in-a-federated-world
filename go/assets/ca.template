@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <base href="/" />
 <title>DeiC SSH Certificate Authority POC</title>
-<link rel="stylesheet" href="https://sshca.lan/zzz/css.css">
+<link rel="stylesheet" href="https://sshca.lan/www/css.css">
 </head>
 <body>
 <section class=ssh>
@@ -62,12 +62,11 @@ function setCurl(weblogin) {
     const key = '$HOME/.ssh/id_ed25519'
     const l = window.location
     const webtoken = l.host == "sshsp.lan"
-    const cmd = `ssh sshweblogin@sshsp.lan`
     const t = '{{ .token }}'
     const host = 'sshca.lan'
     let curl = `ssh -i "${key}.pub" -o IdentitiesOnly=yes sshgencert@${host} ${t} > "${key}-cert.pub"`
     document.querySelector('#curl').innerText = curl
-    let webcurl = curl + `;open \`ssh sshweblogin@sshsp.lan\``
+    let webcurl = curl + `;open \`ssh sshweblogin@sshsp.lan neededparameter\``
     document.querySelector('#weblogin').innerText = webcurl
     const sshkeygen = `ssh-keygen -Lf "${key}-cert.pub"`
     document.querySelector("#sshkeygen").innerText = sshkeygen
@@ -78,7 +77,7 @@ function setCurl(weblogin) {
     navigator.clipboard.writeText(webtoken ? webcurl : curl).then()
     const href = `http:\/\/127.0.0.1:7788?url=${encodeURIComponent(curl)}`
     if (weblogin) {
-        window.location = `http:\/\/127.0.0.1:7788?cmd=${encodeURIComponent(cmd)}`
+        window.location = `http:\/\/127.0.0.1:7788?cmd=${encodeURIComponent(webcurl)}`
     } else {
         fetch(href)
             .then(response => response.text())

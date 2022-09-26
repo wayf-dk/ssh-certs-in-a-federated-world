@@ -41,13 +41,13 @@ NNPF+QQkeINOFYlPaT0bAAAAD3Jvb3RAdGVzdC1hcmtlbgECAwQFBg==
 var (
 	demoAttrs = map[string][]string{
 		"eduPersonPrincipalName": {"hromundartindur@sshca.lan"},
-		"isMemberOf":             {"group-1", "group-2", "group-3", "group-44"},
+		"isMemberOf":             {"group-1", "group-2", "group-3", "group-44", "group-555"},
 	}
 
 	eppnRegexp = regexp.MustCompile(`[^-a-z0-9]`)
 	tmpl       *template.Template
 
-	//go:embed zzz
+	//go:embed www
 	www embed.FS
 
 	//go:embed assets/ca.template
@@ -55,7 +55,11 @@ var (
 )
 
 func main() {
-	switch os.Args[1] {
+    argv1 := ""
+    if len(os.Args) > 1 {
+        argv1 = os.Args[1]
+    }
+	switch argv1 {
 	case  "AuthorizedPrincipalsCommand":
 		authorizedPrincipalsCommand()
 	case "AuthorizedKeysCommand":
@@ -74,8 +78,35 @@ func main() {
 			sh()
 		case "sshgencert":
 			generateSSHCertificate()
+		case "sshweblogin":
+		    sshweblogin()
 		}
 	}
+}
+
+func sshweblogin() {
+    fn, err := os.CreateTemp("/var/run/sshca", "")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	certTxt, err := os.ReadFile(os.Getenv("SSH_USER_AUTH"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	cert, err := unmarshalCert([]byte(certTxt))
+    data := cert.Extensions["groups@wayf.dk"]
+
+	if _, err := fn.Write([]byte(data)); err != nil {
+		log.Fatal(err)
+	}
+	if err := fn.Close(); err != nil {
+		log.Fatal(err)
+	}
+
+	os.Chmod(fn.Name(), 0666)
+	_, token := filepath.Split(fn.Name())
+    fmt.Println("https://sshsp.lan/sshwebclient.php?token="+token)
 }
 
 func client() {
@@ -91,13 +122,16 @@ func client() {
 func clientHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	r.ParseForm()
-	cmd := r.Form.Get("url")
-	fmt.Println(cmd)
-	_, err := exec.Command("/bin/sh", "-c", cmd).Output()
-	fmt.Println(err)
-	cert, err := exec.Command("/bin/sh", "-c", "/usr/local/bin/ssh-keygen -Lf $HOME/.ssh/id_ed25519-cert.pub").Output()
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Write(cert)
+	if cmd := r.Form.Get("url"); cmd != "" {
+        exec.Command("/bin/sh", "-c", cmd).Output()
+        cert, _ := exec.Command("/bin/sh", "-c", "/usr/local/bin/ssh-keygen -Lf $HOME/.ssh/id_ed25519-cert.pub").Output()
+        w.Header().Set("Access-Control-Allow-Origin", "*")
+        w.Write(cert)
+	}
+	if cmd := r.Form.Get("cmd"); cmd != "" {
+    	returnURL, _ := exec.Command("/bin/sh", "-c", cmd).Output()
+        w.Header().Set("location", string(returnURL))
+	}
 }
 
 func ca() {
@@ -108,7 +142,7 @@ func ca() {
 	fs := http.FileServer(http.FS(www))
 
 	httpMux := http.NewServeMux()
-	httpMux.HandleFunc("/zzz/", fs.ServeHTTP)
+	httpMux.HandleFunc("/www/", fs.ServeHTTP)
 	httpMux.HandleFunc("/", caHandler)
 
 	fmt.Println("Listening on port: " + listenOn)
@@ -138,7 +172,7 @@ func caHandler(w http.ResponseWriter, r *http.Request) {
 	_, token := filepath.Split(fn.Name())
 	principal := eppnRegexp.ReplaceAllString(attrs["eduPersonPrincipalName"][0], "_")
 
-	err = tmpl.Execute(w, map[string]string{"token": token, "principal": principal})
+	err = tmpl.Execute(w, map[string]any{"token": token, "principal": template.JS(principal)})
 	fmt.Println(err)
 	return
 }
@@ -149,7 +183,8 @@ func sh() {
 		log.Fatal(err)
 	}
 	cert, err := unmarshalCert([]byte(certTxt))
-	syscall.Exec("/usr/bin/sudo", []string{"/usr/bin/sudo", "/usr/bin/su", "-", cert.KeyId}, os.Environ())
+	args := append([]string{"/usr/bin/sudo", "/usr/bin/su", "-", cert.KeyId}, os.Args[1:] ...)
+	syscall.Exec("/usr/bin/sudo", args, os.Environ())
 }
 
 func generateSSHCertificate() {
@@ -199,6 +234,12 @@ func generateSSHCertificate() {
 }
 
 func authorizedPrincipalsCommand() {
+	cert, _ := unmarshalCert([]byte(os.Args[4] + " " + os.Args[3]))
+	updateUserAndGroups(cert)
+	fmt.Println(cert.KeyId)
+}
+
+func updateUserAndGroups(cert *ssh.Certificate) {
 	f, err := os.OpenFile("/var/log/sshca.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalf("error opening file: %v", err)
@@ -206,14 +247,8 @@ func authorizedPrincipalsCommand() {
 	defer f.Close()
 
 	log.SetOutput(f)
-	cert, _ := unmarshalCert([]byte(os.Args[4] + " " + os.Args[3]))
-	updateUserAndGroups(cert)
-	fmt.Println(cert.KeyId)
-}
-
-func updateUserAndGroups(cert *ssh.Certificate) {
 	attrs := map[string][]string{}
-	err := json.Unmarshal([]byte(cert.Extensions["groups@wayf.dk"]), &attrs)
+	err = json.Unmarshal([]byte(cert.Extensions["groups@wayf.dk"]), &attrs)
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
@@ -228,6 +263,7 @@ func updateUserAndGroups(cert *ssh.Certificate) {
 	}
 	usergroups := strings.Join(attrs["isMemberOf"], ",")
 	out, err = exec.Command("/usr/sbin/usermod", "-G", usergroups, cert.KeyId).Output()
+	log.Println("/usr/sbin/usermod", "-G", usergroups, cert.KeyId)
 }
 
 func authorizedKeysCommand() {
