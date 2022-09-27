@@ -36,7 +36,7 @@ certificate - e.g. if it is expired.
 <p><code id=weblogin></code> <button class=copy data-target=weblogin></button>
 </section>
 <section class=ssh>
-<h2>xInstalled certificate</h2>
+<h2>Installed certificate</h2>
 <pre id=cert></pre>
 </section>
 
