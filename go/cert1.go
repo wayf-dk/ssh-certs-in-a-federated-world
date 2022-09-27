@@ -40,7 +40,7 @@ NNPF+QQkeINOFYlPaT0bAAAAD3Jvb3RAdGVzdC1hcmtlbgECAwQFBg==
 
 var (
 	demoAttrs = map[string][]string{
-		"eduPersonPrincipalName": {"hromundartindur@sshca.lan"},
+		"eduPersonPrincipalName": {"hengill@sshca.lan"},
 		"isMemberOf":             {"group-1", "group-2", "group-3", "group-44", "group-555"},
 	}
 
@@ -52,6 +52,7 @@ var (
 
 	//go:embed assets/ca.template
 	caTemplate string
+    done chan bool
 )
 
 func main() {
@@ -68,6 +69,8 @@ func main() {
 		ca()
 	case "client":
 		client()
+	case "check":
+		check()
 	default:
 		user, err := user.Current()
 		if err != nil {
@@ -85,7 +88,7 @@ func main() {
 }
 
 func sshweblogin() {
-    fn, err := os.CreateTemp("/var/run/sshca", "")
+    fn, err := os.CreateTemp("/var/run/sshcerts", "")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -107,6 +110,45 @@ func sshweblogin() {
 	os.Chmod(fn.Name(), 0666)
 	_, token := filepath.Split(fn.Name())
     fmt.Println("https://sshsp.lan/sshwebclient.php?token="+token)
+}
+
+func check() {
+    /*
+    homeDir, _ := os.UserHomeDir()
+	certTxt, err := os.ReadFile(homeDir+"/.ssh/id_ed25519-cert.pub")
+	if err != nil {
+		log.Fatal(err)
+	}
+	cert, err := unmarshalCert([]byte(certTxt))
+	*/
+    // check validity
+
+  	exec.Command("open", "https://sshca.lan/").Output()
+	const listenOn = "127.0.0.1:7788"
+	httpMux := http.NewServeMux()
+	httpMux.HandleFunc("/", checkHandler)
+
+	done = make(chan bool, 1)
+
+    go func() {
+    	fmt.Println("Listening on port: " + listenOn)
+	    err := http.ListenAndServe(listenOn, httpMux)
+    	fmt.Println("err: ", err)
+	}()
+	<-done
+	log.Println(os.Args)
+	syscall.Exec("/usr/local/bin/ssh", os.Args[2:], os.Environ())
+}
+
+func checkHandler(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	r.ParseForm()
+	cmd := r.Form.Get("url")
+    exec.Command("/bin/sh", "-c", cmd).Output()
+    cert, _ := exec.Command("/bin/sh", "-c", "/usr/local/bin/ssh-keygen -Lf $HOME/.ssh/id_ed25519-cert.pub").Output()
+    w.Header().Set("Access-Control-Allow-Origin", "*")
+    w.Write(cert)
+    done <- true
 }
 
 func client() {
@@ -143,6 +185,7 @@ func ca() {
 
 	httpMux := http.NewServeMux()
 	httpMux.HandleFunc("/www/", fs.ServeHTTP)
+	httpMux.Handle("/favicon.ico", http.NotFoundHandler())
 	httpMux.HandleFunc("/", caHandler)
 
 	fmt.Println("Listening on port: " + listenOn)
@@ -193,7 +236,7 @@ func generateSSHCertificate() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	//os.Remove(fn)
+	os.Remove(fn)
 	attrs := map[string][]string{}
 	err = json.Unmarshal(data, &attrs)
 	if err != nil {
@@ -218,7 +261,7 @@ func generateSSHCertificate() {
 		KeyId:           principal,
 		ValidPrincipals: []string{principal},
 		ValidAfter:      uint64(time.Now().Unix() - 60),
-		ValidBefore:     uint64(time.Now().Unix() + 1*3600),
+		ValidBefore:     uint64(time.Now().Unix() + 24*3600),
 	}
 
 	signer, err := ssh.ParsePrivateKey(privateKey)
@@ -240,15 +283,8 @@ func authorizedPrincipalsCommand() {
 }
 
 func updateUserAndGroups(cert *ssh.Certificate) {
-	f, err := os.OpenFile("/var/log/sshca.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		log.Fatalf("error opening file: %v", err)
-	}
-	defer f.Close()
-
-	log.SetOutput(f)
 	attrs := map[string][]string{}
-	err = json.Unmarshal([]byte(cert.Extensions["groups@wayf.dk"]), &attrs)
+	err := json.Unmarshal([]byte(cert.Extensions["groups@wayf.dk"]), &attrs)
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
