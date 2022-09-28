@@ -34,6 +34,9 @@ eof
 
 /usr/sbin/adduser -gecos "" --disabled-password --shell /usr/local/bin/cert1 sshfedlogin
 /usr/sbin/adduser -gecos "" --disabled-password --shell /usr/local/bin/cert1 sshweblogin
+
+touch /home/sshweblogin/.hushlogin
+
 mkdir -p /var/run/sshcerts
 chown sshweblogin:www-data /var/run/sshcerts
 fi
