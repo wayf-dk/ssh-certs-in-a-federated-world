@@ -75,7 +75,7 @@ function setCurl(weblogin) {
     const sshcmd2 = `ssh {{ .principal }}@test-arken.test.lan`
     document.querySelector("#sshcmd2").innerText = sshcmd2
     navigator.clipboard.writeText(webtoken ? webcurl : curl).then()
-    const href = `http:\/\/127.0.0.1:7788?url=${encodeURIComponent(curl)}`
+    const href = `http:\/\/127.0.0.1:7788/${t}`
     if (weblogin) {
         window.location = `http:\/\/127.0.0.1:7788?cmd=${encodeURIComponent(webcurl)}`
     } else {
