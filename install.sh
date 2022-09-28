@@ -41,4 +41,17 @@ mkdir -p /var/run/sshcerts
 chown sshweblogin:www-data /var/run/sshcerts
 fi
 
+if [ "$1" = "light" ]
+then
+cat > /etc/ssh/sshd_config.d/certs.conf <<eof
+TrustedUserCAKeys /etc/ssh/sshd_config.d/ca-keys.pub
+ExposeAuthInfo yes
+#AuthorizedKeysFile none
+eof
+
+cat > /etc/ssh/sshd_config.d/ca-keys.pub <<eof
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJoDNr0ec0yRaDdr7NhQtJkaNNPF+QQkeINOFYlPaT0b
+eof
+fi
+
 systemctl restart sshd
