@@ -27,7 +27,7 @@ already in place. It just requires adding a TrustedUserCAKeys parameter pointing
 of the trusted SSH CAs.
 
 You might want to add a "AuthorizedKeysFile none" as well to disallow the use of normal public keys in the
-.ssh/authorized_keys ir .ssh/authorized_keys2 files.
+.ssh/authorized_keys or .ssh/authorized_keys2 files.
 
 This POC includes the ability to create and update users depending on the content of the certificate.
 

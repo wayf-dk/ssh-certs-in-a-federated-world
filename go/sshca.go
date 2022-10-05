@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto"
-	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/sha512"
@@ -13,30 +12,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"golang.org/x/crypto/ssh"
 	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
-	"os/user"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"syscall"
-	"time"
 )
-
-var privateKey = []byte(`-----BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-QyNTUxOQAAACCaAza9HnNMkWg3a+zYULSZGjTTxfkEJHiDThWJT2k9GwAAAJhom4IiaJuC
-IgAAAAtzc2gtZWQyNTUxOQAAACCaAza9HnNMkWg3a+zYULSZGjTTxfkEJHiDThWJT2k9Gw
-AAAECXeO3/o6VrHpHiPY95Whg+BjaMgQLQzkbgWr40O7oGXJoDNr0ec0yRaDdr7NhQtJka
-NNPF+QQkeINOFYlPaT0bAAAAD3Jvb3RAdGVzdC1hcmtlbgECAwQFBg==
------END OPENSSH PRIVATE KEY-----
-`)
 
 var (
 	eppnRegexp = regexp.MustCompile(`[^-a-zA-Z0-9]`)
@@ -51,60 +36,7 @@ var (
 )
 
 func main() {
-	argv1 := ""
-	if len(os.Args) > 1 {
-		argv1 = os.Args[1]
-	}
-	switch argv1 {
-	case "AuthorizedKeysCommand":
-		authorizedKeysCommand()
-	case "CA":
-		ca()
-	default:
-		user, err := user.Current()
-		if err != nil {
-			log.Fatalf(err.Error())
-		}
-		switch user.Username {
-		case "sshfedlogin":
-			sh()
-		case "sshgencert":
-			generateSSHCertificate()
-		case "sshweblogin":
-			sshweblogin()
-		}
-	}
-}
-
-func sshweblogin() {
-	fn, err := os.CreateTemp("/var/run/sshcerts", "")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	certTxt, err := os.ReadFile(os.Getenv("SSH_USER_AUTH"))
-	if err != nil {
-		log.Fatal(err)
-	}
-	cert, err := unmarshalCert([]byte(certTxt))
-	data := cert.Extensions["groups@wayf.dk"]
-
-	if _, err := fn.Write([]byte(data)); err != nil {
-		log.Fatal(err)
-	}
-	if err := fn.Close(); err != nil {
-		log.Fatal(err)
-	}
-
-	os.Chmod(fn.Name(), 0666)
-	_, token := filepath.Split(fn.Name())
-	fmt.Print("https://sshsp.lan/sshwebclient.php?token=" + token)
-}
-
-func authorizedKeysCommand() {
-	if os.Args[2] == "sshgencert" {
-		fmt.Println(os.Args[4] + " " + os.Args[3])
-	}
+	ca()
 }
 
 func ca() {
@@ -175,52 +107,6 @@ func caHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = tmpl.Execute(w, map[string]any{"token": token, "principal": template.JS(principal)})
 	return
-}
-
-func generateSSHCertificate() {
-	fn := "/var/run/sshca/" + os.Args[2]
-	data, err := os.ReadFile(fn)
-	if err != nil {
-		log.Fatal(err)
-	}
-	os.Remove(fn)
-	attrs := map[string]any{}
-	err = json.Unmarshal(data, &attrs)
-	if err != nil {
-		log.Panic(err)
-	}
-	principal := eppnRegexp.ReplaceAllString(attrs["eduPersonPrincipalName"].([]interface{})[0].(string), "_")
-	bytes, err := os.ReadFile(os.Getenv("SSH_USER_AUTH"))
-	if err != nil {
-		log.Fatal(err)
-	}
-	pub, _, _, _, err := ssh.ParseAuthorizedKey(bytes)
-	if err != nil {
-		log.Fatal(err)
-	}
-	cert := &ssh.Certificate{
-		CertType: ssh.UserCert,
-		Key:      pub,
-		Permissions: ssh.Permissions{
-			CriticalOptions: map[string]string{},
-			Extensions:      map[string]string{"permit-agent-forwarding": "", "permit-pty": "", "groups@wayf.dk": string(data)},
-		},
-		KeyId:           principal,
-		ValidPrincipals: []string{principal, "sshfedlogin", "sshweblogin"},
-		ValidAfter:      uint64(time.Now().Unix() - 60),
-		ValidBefore:     uint64(time.Now().Unix() + 24*3600),
-	}
-
-	signer, err := ssh.ParsePrivateKey(privateKey)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = cert.SignCert(rand.Reader, signer)
-	if err != nil {
-		log.Fatal(err)
-	}
-	certTxt := ssh.MarshalAuthorizedKey(cert)
-	fmt.Print(string(certTxt))
 }
 
 func SAML2jwt(w http.ResponseWriter, service string, v url.Values, certificates []string) (res map[string]interface{}, err error) {
@@ -321,81 +207,5 @@ func cert2publicKey(cert string) (publickey *rsa.PublicKey, err error) {
 		return
 	}
 	publickey = pk.PublicKey.(*rsa.PublicKey)
-	return
-}
-
-func sh() {
-	certTxt, err := os.ReadFile(os.Getenv("SSH_USER_AUTH"))
-	if err != nil {
-		log.Fatal(err)
-	}
-	cert, err := unmarshalCert([]byte(certTxt))
-	updateUserAndGroups(cert)
-	args := append([]string{"/usr/bin/sudo", "/usr/bin/su", "--login", cert.KeyId}, os.Args[1:]...)
-	syscall.Exec("/usr/bin/sudo", args, os.Environ())
-}
-
-func updateUserAndGroups(cert *ssh.Certificate) {
-	attrs := map[string]any{}
-	err := json.Unmarshal([]byte(cert.Extensions["groups@wayf.dk"]), &attrs)
-	if err != nil {
-		log.Fatalf(err.Error())
-	}
-
-	isMemberOf := []string{}
-	for _, e := range attrs["isMemberOf"].([]any) {
-		g := strings.ToLower(e.(string))
-		if len(g) > 32 {
-			continue
-		}
-		isMemberOf = append(isMemberOf, eppnRegexp.ReplaceAllString(g, "_"))
-	}
-	isMemberOf = append(isMemberOf, cert.KeyId)
-
-	out, err := exec.Command("/usr/bin/sudo", "/usr/sbin/adduser", "--gecos", "", "--disabled-password", cert.KeyId).Output()
-	out, err = exec.Command("/usr/bin/sh", "-c", "/usr/bin/getent group | cut -d: -f1").Output()
-	existingGroups := strings.Split(string(out), "\n")
-	newgroups := difference(isMemberOf, existingGroups)
-	for _, grp := range newgroups {
-		out, err = exec.Command("/usr/bin/sudo", "/usr/sbin/addgroup", grp).Output()
-	}
-	usergroups := strings.Join(isMemberOf, ",")
-	out, err = exec.Command("/usr/bin/sudo", "/usr/sbin/usermod", "-G", usergroups, cert.KeyId).Output()
-}
-
-func unmarshalCert(bytes []byte) (*ssh.Certificate, error) {
-	pub, _, _, _, err := ssh.ParseAuthorizedKey(bytes)
-	if err != nil {
-		return nil, err
-	}
-	cert, ok := pub.(*ssh.Certificate)
-	if !ok {
-		return nil, fmt.Errorf("failed to cast to certificate")
-	}
-	return cert, nil
-}
-
-// PP - super simple Pretty Print - using JSON
-func PP(i ...interface{}) {
-	for _, e := range i {
-		s, _ := json.MarshalIndent(e, "", "    ")
-		log.Println(string(s))
-	}
-	return
-}
-
-// Set Difference: A - B
-func difference(a, b []string) (diff []string) {
-	m := make(map[string]bool)
-
-	for _, item := range b {
-		m[item] = true
-	}
-
-	for _, item := range a {
-		if _, ok := m[item]; !ok {
-			diff = append(diff, item)
-		}
-	}
 	return
 }

@@ -14,9 +14,12 @@
 <p><code id=certpublickey>ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJoDNr0ec0yRaDdr7NhQtJkaNNPF+QQkeINOFYlPaT0b</code> <button class=copy data-target=certpublickey></button>
 </section>
 <section>
+<iframe id=mindthegap frameborder="0" src="/mindthegap.html?acs=1&sp=http://ssh-ca.deic.dk" style="width: 350px; height: 100px;"></iframe>
+</section>
+<section id=principal>
 <p>Hello <em>{{ .principal }}</em>
 </section>
-<section class=ssh>
+<section id=manual>
 
 <h2>SSH login</h2>
 <p>For this POC the CA will use the public key <em>$HOME/.ssh/id_ed25519.pub</em> and create a SSH certificate <em>$HOME/.ssh/id_ed25519-cert.pub</em>. The SSH certificate will be valid for 24 hours.
@@ -30,12 +33,14 @@
 <p>You can use <code id=sshkeygen>ssh-keygen -Lf .ssh/&lt;privat nøgle navn&gt;-cert.pub</code> <button class=copy data-target=sshkeygen></button> to see if the contents of the
 certificate - e.g. if it is expired.
 </section>
-<section class=web>
+
+<section id=web>
 <h2>SSH-based weblogin</h2>
 <button onclick="setCurl(1);">Weblogin</button>
 <p><code id=weblogin></code> <button class=copy data-target=weblogin></button>
 </section>
-<section class=ssh>
+
+<section id=auto>
 <h2>Installed certificate</h2>
 <pre id=cert></pre>
 </section>
@@ -59,32 +64,46 @@ buttons.forEach(b => b.addEventListener('click', e => {
 setCurl(false)
 
 function setCurl(weblogin) {
-    const key = '$HOME/.ssh/id_ed25519'
+    const key = '$HOME.ssh/id_ed25519'
     const l = window.location
     const webtoken = l.host == "sshsp.lan"
     const t = '{{ .token }}'
     const host = 'sshca.lan'
-    let curl = `ssh -i "${key}.pub" -o IdentitiesOnly=yes sshgencert@${host} ${t} > "${key}-cert.pub"`
-    document.querySelector('#curl').innerText = curl
-    let webcurl = curl + `;open \`ssh sshweblogin@sshsp.lan neededparameter\``
-    document.querySelector('#weblogin').innerText = webcurl
+
+    let manual = false
+
+    document.querySelector('#mindthegap').setAttribute("src", `/mindthegap.html?acs=${window.location.toString().slice(0, -1)}&sp=http:\/\/ssh-ca.deic.dk`)
+
+    let getCertCmd = `ssh -i "${key}.pub" -o IdentitiesOnly=yes sshgencert@${host} ${t} > "${key}-cert.pub"`
+    document.querySelector('#curl').innerText = getCertCmd
+    let webLoginCmd = `ssh -i "${key}.pub" -o IdentitiesOnly=yes sshgencert@${host} ${t} > "${key}-cert.pub" ;open \`ssh sshweblogin@sshsp.lan\``
+    document.querySelector('#weblogin').innerText = webLoginCmd
     const sshkeygen = `ssh-keygen -Lf "${key}-cert.pub"`
     document.querySelector("#sshkeygen").innerText = sshkeygen
     const sshcmd = `ssh sshfedlogin@test-arken.test.lan`
     document.querySelector("#sshcmd").innerText = sshcmd
     const sshcmd2 = `ssh {{ .principal }}@test-arken.test.lan`
     document.querySelector("#sshcmd2").innerText = sshcmd2
-    navigator.clipboard.writeText(webtoken ? webcurl : curl).then()
-    const href = `http:\/\/127.0.0.1:7788/${t}`
-    if (weblogin) {
-        window.location = `http:\/\/127.0.0.1:7788?cmd=${encodeURIComponent(webcurl)}`
-    } else {
+    navigator.clipboard.writeText(webtoken ? webLoginCmd : getCertCmd).then()
+    let href = `http:\/\/127.0.0.1:7788/${t}`
+    if (t) {
         fetch(href)
             .then(response => response.text())
-            .then(data => document.querySelector('#cert').innerText = data)
+            .then(data => { if (weblogin) {
+                    window.location = data
+                } else {
+                    document.querySelector('#cert').innerText = data
+                }})
+            .catch(xxx => { manual = true; console.log(manual)} )
+            .finally(() => {
+                document.querySelector('#principal').style.display = t ? '' : 'none'
+                document.querySelector('#auto').style.display = manual ? 'none' : ''
+                document.querySelector('#manual').style.display = manual ? '' : 'none'
+                document.querySelector('#web').style.display = t ? '' : 'none'
+            })
+    } else {
+        ['principal', 'auto', 'manual', 'web'].forEach(e => document.querySelector(`#${e}`).style.display = 'none')
     }
-    const klass = {true: 'ssh', false: 'web'}[webtoken == 1]
-    for (let el of document.querySelectorAll(`.${klass}`)) el.style.display = 'none';
     return false;
 }
 </script>
