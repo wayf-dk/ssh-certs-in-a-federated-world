@@ -15,8 +15,24 @@ import (
 var (
 	eppnRegexp = regexp.MustCompile(`[^-a-zA-Z0-9]`)
 
-    //go:embed assets/ca.key
+	//go:embed assets/ca.key
 	privateKey []byte
+
+	ssh2name = map[string]string{
+		"ssh-ed25519-cert-v01@openssh.com":                            "ed25519",
+		"ecdsa-sha2-nistp256-cert-v01@openssh.com":                    "ecdsa",
+		"ecdsa-sha2-nistp384-cert-v01@openssh.com":                    "ecdsa",
+		"ecdsa-sha2-nistp521-cert-v01@openssh.com":                    "ecdsa",
+		"sk-ssh-ed25519-cert-v01@openssh.com":                         "ed25519_sk",
+		"sk-ecdsa-sha2-nistp256-cert-v01@openssh.com":                 "ecdsa_sk",
+		"rsa-sha2-512-cert-v01@openssh.com":                           "rsa",
+		"rsa-sha2-256-cert-v01@openssh.com":                           "rsa",
+		"ssh-ed25519":                                                 "ed25519",
+		"ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521": "ecdsa",
+		"sk-ecdsa-sha2-nistp256@openssh.com":                          "ecdsa_sk",
+		"sk-ssh-ed25519@openssh.com":                                  "ed25519_sk",
+		"rsa-sha2-512,rsa-sha2-256":                                   "rsa",
+	}
 )
 
 func main() {
@@ -29,7 +45,7 @@ func generateSSHCertificate() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	os.Remove(fn)
+	//	os.Remove(fn)
 	attrs := map[string]any{}
 	err = json.Unmarshal(data, &attrs)
 	if err != nil {
@@ -66,5 +82,5 @@ func generateSSHCertificate() {
 		log.Fatal(err)
 	}
 	certTxt := ssh.MarshalAuthorizedKey(cert)
-	fmt.Print(string(certTxt))
+	fmt.Printf("%s\n%s", ssh2name[pub.Type()], string(certTxt))
 }

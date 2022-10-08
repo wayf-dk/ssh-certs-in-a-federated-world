@@ -1,4 +1,3 @@
-HI
 <?php
 header('content-type: text/plain');
 $fn = "/var/run/sshcerts/".$_GET['token'];

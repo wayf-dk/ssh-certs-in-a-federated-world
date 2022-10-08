@@ -22,16 +22,13 @@
 <section id=manual>
 
 <h2>SSH login</h2>
-<p>For this POC the CA will use the public key <em>$HOME/.ssh/id_ed25519.pub</em> and create a SSH certificate <em>$HOME/.ssh/id_ed25519-cert.pub</em>. The SSH certificate will be valid for 24 hours.
-
-<p>The command below is already copied to your clipboard. Execute it in a shell to upload the public key and download the SSH certificate.
+<p>The command below is already copied to your clipboard.
+Execute it in a shell to upload the public key and download the SSH certificate.
+The SSH certificate will be valid for 24 hours
+<p>For this POC the CA will use first key that the ssh client presents for it.
 <p><code id=curl></code> <button class=copy data-target=curl></button>
-<p>For your first login copy the command below and excecute it in a shell:
+<p>To login copy the command below and excecute it in a shell:
 <p><code id=sshcmd></code> <button class=copy data-target=sshcmd></button>
-<p>For subsequent logins copy the command below and excecute it in a shell:
-<p><code id=sshcmd2></code> <button class=copy data-target=sshcmd2></button>
-<p>You can use <code id=sshkeygen>ssh-keygen -Lf .ssh/&lt;privat nøgle navn&gt;-cert.pub</code> <button class=copy data-target=sshkeygen></button> to see if the contents of the
-certificate - e.g. if it is expired.
 </section>
 
 <section id=web>
@@ -64,7 +61,7 @@ buttons.forEach(b => b.addEventListener('click', e => {
 setCurl(false)
 
 function setCurl(weblogin) {
-    const key = '$HOME.ssh/id_ed25519'
+    const key = '~/.ssh/id_ed25519'
     const l = window.location
     const webtoken = l.host == "sshsp.lan"
     const t = '{{ .token }}'
@@ -74,18 +71,17 @@ function setCurl(weblogin) {
 
     document.querySelector('#mindthegap').setAttribute("src", `/mindthegap.html?acs=${window.location.toString().slice(0, -1)}&sp=http:\/\/ssh-ca.deic.dk`)
 
-    let getCertCmd = `ssh -i "${key}.pub" -o IdentitiesOnly=yes sshgencert@${host} ${t} > "${key}-cert.pub"`
+    let getCertCmd = `ssh ssh:\/\/sshca.lan:2022 ${t} | (read type && cat > ~/.ssh/id_$type-cert.pub)`
     document.querySelector('#curl').innerText = getCertCmd
-    let webLoginCmd = `ssh -i "${key}.pub" -o IdentitiesOnly=yes sshgencert@${host} ${t} > "${key}-cert.pub" ;open \`ssh sshweblogin@sshsp.lan\``
+    let webLoginCmd = `ssh sshgencert@${host} ${t} > "${key}-cert.pub" ;open \`ssh sshweblogin@sshsp.lan\``
     document.querySelector('#weblogin').innerText = webLoginCmd
-    const sshkeygen = `ssh-keygen -Lf "${key}-cert.pub"`
-    document.querySelector("#sshkeygen").innerText = sshkeygen
-    const sshcmd = `ssh sshfedlogin@test-arken.test.lan`
+//  const sshkeygen = `ssh-keygen -Lf "${key}-cert.pub"`
+//  document.querySelector("#sshkeygen").innerText = sshkeygen
+//  const sshcmd = `ssh sshfedlogin@sshserver.lan`
+    const sshcmd = `ssh {{ .principal }}@sshserver.lan`
     document.querySelector("#sshcmd").innerText = sshcmd
-    const sshcmd2 = `ssh {{ .principal }}@test-arken.test.lan`
-    document.querySelector("#sshcmd2").innerText = sshcmd2
     navigator.clipboard.writeText(webtoken ? webLoginCmd : getCertCmd).then()
-    let href = `http:\/\/127.0.0.1:7788/${t}`
+    let href = `http:\/\/127.0.0.1:7778/${t}`
     if (t) {
         fetch(href)
             .then(response => response.text())
@@ -99,7 +95,7 @@ function setCurl(weblogin) {
                 document.querySelector('#principal').style.display = t ? '' : 'none'
                 document.querySelector('#auto').style.display = manual ? 'none' : ''
                 document.querySelector('#manual').style.display = manual ? '' : 'none'
-                document.querySelector('#web').style.display = t ? '' : 'none'
+                document.querySelector('#web').style.display = 'none' // t ? '' : 'none'
             })
     } else {
         ['principal', 'auto', 'manual', 'web'].forEach(e => document.querySelector(`#${e}`).style.display = 'none')

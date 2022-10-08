@@ -2,20 +2,20 @@
 
 if [ "$1" = "CA" ]
 then
+systemctl stop sshca
 cp go/sshca /usr/local/bin/sshca
-cp go/sshgencertshell /usr/local/bin/sshgencertshell
-cp go/authorizedKeysCommand /usr/local/bin/authorizedKeysCommand
-/usr/sbin/adduser -gecos "" --disabled-password --shell /usr/local/bin/sshgencertshell sshgencert
-mkdir -p /var/run/sshca
-chown sshgencert:www-data /var/run/sshca
 
-cat > /etc/ssh/sshd_config.d/ca.conf <<eof
-AuthorizedKeysCommandUser root
-AuthorizedKeysCommand /usr/local/bin/authorizedKeysCommand %u %k %t
-ExposeAuthInfo yes
+cat > /etc/systemd/system/sshca.service <<eof
+[Unit]
+Description=SSH CA Web
+
+[Service]
+ExecStart=/usr/local/bin/sshca
 eof
+
+systemctl start sshca
+
 fi
-systemctl restart sshd
 
 if [ "$1" = "sshserver" ]
 then
@@ -23,6 +23,7 @@ cat > /etc/ssh/sshd_config.d/certs.conf <<eof
 TrustedUserCAKeys /etc/ssh/sshd_config.d/ca-keys.pub
 ExposeAuthInfo yes
 #AuthorizedKeysFile none
+Banner /etc/ssh/sshd_config.d/ca-banner.txt
 eof
 
 cat > /etc/ssh/sshd_config.d/ca-keys.pub <<eof
@@ -30,7 +31,7 @@ ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJoDNr0ec0yRaDdr7NhQtJkaNNPF+QQkeINOFYlPaT0b
 eof
 
 cat > /etc/ssh/sshd_config.d/ca-banner.txt <<eof
-login at https://sshca.lan
+Get a SSH certificate at: https://sshca.lan
 eof
 
 systemctl restart sshd

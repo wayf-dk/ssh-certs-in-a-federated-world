@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/sha512"
@@ -9,33 +10,69 @@ import (
 	"crypto/x509"
 	"embed"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
+	"io"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
+	"time"
+
+	"golang.org/x/crypto/ssh"
+)
+
+type (
+	bucket struct {
+		Claims [2]map[string]string
+		Ttl    [2]time.Time
+		Mutex  sync.RWMutex
+	}
 )
 
 var (
-	eppnRegexp = regexp.MustCompile(`[^-a-zA-Z0-9]`)
-	tmpl       *template.Template
-
 	//go:embed www
 	www embed.FS
 
 	//go:embed assets/ca.template
 	caTemplate string
-	done       chan bool
+
+	//go:embed assets/ca.key
+	privateKey []byte
+
+	eppnRegexp = regexp.MustCompile(`[^-a-zA-Z0-9]`)
+	tmpl       *template.Template
+
+	done   chan bool
+	claims = &bucket{}
+
+	ssh2name = map[string]string{
+		"ssh-ed25519-cert-v01@openssh.com":                            "ed25519",
+		"ecdsa-sha2-nistp256-cert-v01@openssh.com":                    "ecdsa",
+		"ecdsa-sha2-nistp384-cert-v01@openssh.com":                    "ecdsa",
+		"ecdsa-sha2-nistp521-cert-v01@openssh.com":                    "ecdsa",
+		"sk-ssh-ed25519-cert-v01@openssh.com":                         "ed25519_sk",
+		"sk-ecdsa-sha2-nistp256-cert-v01@openssh.com":                 "ecdsa_sk",
+		"rsa-sha2-512-cert-v01@openssh.com":                           "rsa",
+		"rsa-sha2-256-cert-v01@openssh.com":                           "rsa",
+		"ssh-ed25519":                                                 "ed25519",
+		"ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521": "ecdsa",
+		"sk-ecdsa-sha2-nistp256@openssh.com":                          "ecdsa_sk",
+		"sk-ssh-ed25519@openssh.com":                                  "ed25519_sk",
+		"rsa-sha2-512,rsa-sha2-256":                                   "rsa",
+	}
 )
 
 func main() {
+	go sshserver()
 	ca()
 }
 
@@ -89,20 +126,7 @@ func caHandler(w http.ResponseWriter, r *http.Request) {
 	principal := attrs["eduPersonPrincipalName"].([]interface{})[0].(string)
 	data, err := json.Marshal(attrs)
 
-	fn, err := os.CreateTemp("/var/run/sshca", "")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if _, err := fn.Write(data); err != nil {
-		log.Fatal(err)
-	}
-	if err := fn.Close(); err != nil {
-		log.Fatal(err)
-	}
-
-	os.Chmod(fn.Name(), 0666)
-	_, token := filepath.Split(fn.Name())
+	token := claims.put(string(data))
 	principal = eppnRegexp.ReplaceAllString(principal, "_")
 
 	err = tmpl.Execute(w, map[string]any{"token": token, "principal": template.JS(principal)})
@@ -208,4 +232,157 @@ func cert2publicKey(cert string) (publickey *rsa.PublicKey, err error) {
 	}
 	publickey = pk.PublicKey.(*rsa.PublicKey)
 	return
+}
+
+var clientPubKey ssh.PublicKey
+
+func sshserver() {
+	// An SSH server is represented by a ServerConfig, which holds
+	// certificate details and handles authentication of ServerConns.
+	config := &ssh.ServerConfig{
+		// Remove to disable public key auth.
+		PublicKeyCallback: func(c ssh.ConnMetadata, pubKey ssh.PublicKey) (*ssh.Permissions, error) {
+		    clientPubKey = pubKey
+		    return nil, nil
+		},
+	}
+
+	privateBytes, err := os.ReadFile("/etc/ssh/ssh_host_ed25519_key")
+	if err != nil {
+		log.Fatal("Failed to load private key: ", err)
+	}
+
+	private, err := ssh.ParsePrivateKey(privateBytes)
+	if err != nil {
+		log.Fatal("Failed to parse private key: ", err)
+	}
+
+	config.AddHostKey(private)
+
+	// Once a ServerConfig has been configured, connections can be
+	// accepted.
+	listener, err := net.Listen("tcp", "0.0.0.0:2022")
+	if err != nil {
+		log.Fatal("failed to listen for connection: ", err)
+	}
+    fmt.Println("listening on 2022")
+
+	for {
+		nConn, err := listener.Accept()
+		if err != nil {
+			log.Fatal("failed to accept incoming connection: ", err)
+		}
+
+		// Before use, a handshake must be performed on the incoming
+		// net.Conn.
+		conn, chans, reqs, err := ssh.NewServerConn(nConn, config)
+		if err != nil {
+			log.Fatal("failed to handshake: ", err)
+		}
+
+		// The incoming Request channel must be serviced.
+		go ssh.DiscardRequests(reqs)
+
+
+		for newChannel := range chans {
+            if newChannel.ChannelType() != "session" {
+                newChannel.Reject(ssh.UnknownChannelType, "unknown channel type")
+                continue
+            }
+
+			channel, reqs, err := newChannel.Accept()
+			if err != nil {
+				log.Fatalf("Could not accept channel: %v", err)
+			}
+
+            for req := range reqs {
+                if req.Type == "exec" {
+                    if data, ok := claims.get(string(req.Payload[4:])); ok { // string with 32 bits length prefix
+                        certTxt := newCertificate(data)
+                        io.WriteString(channel, fmt.Sprintf("%s\n%s", ssh2name[clientPubKey.Type()], certTxt))
+                    }
+                    break
+                }
+            }
+            channel.Close()
+		}
+		conn.Close()
+	}
+}
+
+func newCertificate(data string) (certTxt string) {
+ 	attrs := map[string]any{}
+	err := json.Unmarshal([]byte(data), &attrs)
+	if err != nil {
+		log.Panic(err)
+	}
+	principal := eppnRegexp.ReplaceAllString(attrs["eduPersonPrincipalName"].([]interface{})[0].(string), "_")
+    cert := &ssh.Certificate{
+        CertType: ssh.UserCert,
+        Key:      clientPubKey,
+        Permissions: ssh.Permissions{
+            CriticalOptions: map[string]string{},
+            Extensions:      map[string]string{"permit-agent-forwarding": "", "permit-pty": "", "groups@wayf.dk": string(data)},
+        },
+        KeyId:           principal,
+        ValidPrincipals: []string{principal, "sshfedlogin", "sshweblogin"},
+        ValidAfter:      uint64(time.Now().Unix() - 60),
+        ValidBefore:     uint64(time.Now().Unix() + 24*3600),
+    }
+
+    signer, err := ssh.ParsePrivateKey(privateKey)
+    if err != nil {
+        log.Fatal(err)
+    }
+    err = cert.SignCert(rand.Reader, signer)
+    if err != nil {
+        log.Fatal(err)
+    }
+    certTxt = string(ssh.MarshalAuthorizedKey(cert))
+    return
+}
+
+
+func (s *bucket) put(v string) (k string) {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+	k = nonce()
+	s.update()
+	s.Claims[1][k] = v
+	return
+}
+
+func (s *bucket) get(k string) (v string, ok bool) {
+	s.Mutex.RLock()
+	defer s.Mutex.RUnlock()
+	s.update()
+    for i, _ := range "01" {
+        if v, ok = s.Claims[i][k]; ok {
+            delete(s.Claims[i], k) // no-ops if nothing there ...
+            return
+        }
+    }
+	return
+}
+
+func (s *bucket) update() {
+	const ttl = time.Second * 120
+	for _, _ = range "01" {
+		if s.Ttl[0].Before(time.Now()) {
+			s.Claims[0], s.Claims[1] = s.Claims[1], map[string]string{}
+			s.Ttl[0], s.Ttl[1] = s.Ttl[1], time.Now().Add(ttl)
+		} else {
+			return // if 1st bucket is ok no need to check the last
+		}
+	}
+}
+
+func nonce() (s string) {
+	b := make([]byte, 8) // 64 bits
+	_, err := rand.Read(b)
+	if err != nil {
+		log.Panic("Problem with making random number:", err)
+	}
+	b[0] = b[0] & byte(0x7f) // make sure it is a positive 64 bit number
+	return hex.EncodeToString(b)
 }

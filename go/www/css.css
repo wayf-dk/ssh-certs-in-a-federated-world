@@ -10,10 +10,6 @@ p, h3, h4, h5, details { margin: 5px 5px; padding: 0.1em; }
 td { padding: 0.2em 0.5em; }
 .hidden { display: none; }
 
-code {
-    font-size: 80%;
-}
-
 .cardx, .container, section
 {
 	/* Add shadows to create the "card" effect */
