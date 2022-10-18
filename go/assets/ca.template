@@ -10,8 +10,6 @@
 <section class=ssh>
 <H2>DeiC SSH Certificate Authority POC</h2>
 <p>The DEiC SSH Certificate Authority creates SSH certificates based on a federated login.
-<p>The public key for the certificate authority is:
-<p><code id=certpublickey>ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJoDNr0ec0yRaDdr7NhQtJkaNNPF+QQkeINOFYlPaT0b</code> <button class=copy data-target=certpublickey></button>
 </section>
 <section>
 <iframe id=mindthegap frameborder="0" src="/mindthegap.html?acs=1&sp=http://ssh-ca.deic.dk" style="width: 350px; height: 100px;"></iframe>
@@ -71,7 +69,7 @@ function setCurl(weblogin) {
 
     document.querySelector('#mindthegap').setAttribute("src", `/mindthegap.html?acs=${window.location.toString().slice(0, -1)}&sp=http:\/\/ssh-ca.deic.dk`)
 
-    let getCertCmd = `ssh ssh:\/\/sshca.lan:2022 ${t} | (read type && cat > ~/.ssh/id_$type-cert.pub)`
+    let getCertCmd = `ssh -p 2022 certs@sshca.lan ${t} > ~/.ssh/id_ed25519-cert.pub`
     document.querySelector('#curl').innerText = getCertCmd
     let webLoginCmd = `ssh sshgencert@${host} ${t} > "${key}-cert.pub" ;open \`ssh sshweblogin@sshsp.lan\``
     document.querySelector('#weblogin').innerText = webLoginCmd
@@ -81,9 +79,9 @@ function setCurl(weblogin) {
     const sshcmd = `ssh {{ .principal }}@sshserver.lan`
     document.querySelector("#sshcmd").innerText = sshcmd
     navigator.clipboard.writeText(webtoken ? webLoginCmd : getCertCmd).then()
-    let href = `http:\/\/127.0.0.1:7778/${t}`
     if (t) {
-        fetch(href)
+        fetch(`http:\/\/127.0.0.1:7778/${t}`).finally((x) => console.log(x))
+        fetch(`/feedback/${t}`)
             .then(response => response.text())
             .then(data => { if (weblogin) {
                     window.location = data

@@ -27,36 +27,38 @@ func sshfedloginshell() {
 	}
 	cert, err := unmarshalCert([]byte(certTxt))
 	updateUserAndGroups(cert)
-	args := append([]string{"/usr/bin/sudo", "/usr/bin/su", "--login", cert.KeyId}, os.Args[1:]...)
+	args := append([]string{"/usr/bin/sudo", "--login", "--user="+cert.KeyId}, os.Args[1:]...)
 	syscall.Exec("/usr/bin/sudo", args, os.Environ())
 }
 
 func updateUserAndGroups(cert *ssh.Certificate) {
-	attrs := map[string]any{}
-	err := json.Unmarshal([]byte(cert.Extensions["groups@wayf.dk"]), &attrs)
-	if err != nil {
-		log.Fatalf(err.Error())
-	}
-
-	isMemberOf := []string{}
-	for _, e := range attrs["isMemberOf"].([]any) {
-		g := strings.ToLower(e.(string))
-		if len(g) > 32 {
-			continue
-		}
-		isMemberOf = append(isMemberOf, eppnRegexp.ReplaceAllString(g, "_"))
-	}
-	isMemberOf = append(isMemberOf, cert.KeyId)
-
 	out, err := exec.Command("/usr/bin/sudo", "/usr/sbin/adduser", "--gecos", "", "--disabled-password", cert.KeyId).Output()
-	out, err = exec.Command("/usr/bin/sh", "-c", "/usr/bin/getent group | cut -d: -f1").Output()
-	existingGroups := strings.Split(string(out), "\n")
-	newgroups := difference(isMemberOf, existingGroups)
-	for _, grp := range newgroups {
-		out, err = exec.Command("/usr/bin/sudo", "/usr/sbin/addgroup", grp).Output()
+	attrs := map[string]any{}
+	err = json.Unmarshal([]byte(cert.Extensions["groups@wayf.dk"]), &attrs)
+	if err != nil {
+		return // log.Fatalf(err.Error())
 	}
-	usergroups := strings.Join(isMemberOf, ",")
-	out, err = exec.Command("/usr/bin/sudo", "/usr/sbin/usermod", "-G", usergroups, cert.KeyId).Output()
+
+	if attrs["isMemberOf"] != nil {
+		isMemberOf := []string{}
+		for _, e := range attrs["isMemberOf"].([]any) {
+			g := strings.ToLower(e.(string))
+			if len(g) > 32 {
+				continue
+			}
+			isMemberOf = append(isMemberOf, eppnRegexp.ReplaceAllString(g, "_"))
+		}
+		isMemberOf = append(isMemberOf, cert.KeyId)
+
+		out, err = exec.Command("/usr/bin/sh", "-c", "/usr/bin/getent group | cut -d: -f1").Output()
+		existingGroups := strings.Split(string(out), "\n")
+		newgroups := difference(isMemberOf, existingGroups)
+		for _, grp := range newgroups {
+			out, err = exec.Command("/usr/bin/sudo", "/usr/sbin/addgroup", grp).Output()
+		}
+		usergroups := strings.Join(isMemberOf, ",")
+		out, err = exec.Command("/usr/bin/sudo", "/usr/sbin/usermod", "-G", usergroups, cert.KeyId).Output()
+	}
 }
 
 func unmarshalCert(bytes []byte) (*ssh.Certificate, error) {

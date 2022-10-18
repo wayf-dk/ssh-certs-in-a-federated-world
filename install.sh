@@ -23,15 +23,10 @@ cat > /etc/ssh/sshd_config.d/certs.conf <<eof
 TrustedUserCAKeys /etc/ssh/sshd_config.d/ca-keys.pub
 ExposeAuthInfo yes
 #AuthorizedKeysFile none
-Banner /etc/ssh/sshd_config.d/ca-banner.txt
 eof
 
 cat > /etc/ssh/sshd_config.d/ca-keys.pub <<eof
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJoDNr0ec0yRaDdr7NhQtJkaNNPF+QQkeINOFYlPaT0b
-eof
-
-cat > /etc/ssh/sshd_config.d/ca-banner.txt <<eof
-Get a SSH certificate at: https://sshca.lan
 eof
 
 systemctl restart sshd
@@ -44,9 +39,16 @@ cp go/sshfedloginshell /usr/local/bin/sshfedloginshell
 
 /usr/sbin/adduser -gecos "" --disabled-password --shell /usr/local/bin/sshfedloginshell sshfedlogin
 
-cat > /etc/sudoers.d/10_sshfedlogin <<eof
-sshfedlogin ALL=(root) NOPASSWD: /usr/bin/su, /usr/sbin/adduser, /usr/sbin/addgroup, /usr/sbin/usermod
+cat > /etc/ssh/sshd_config.d/sshfedlogin.conf <<eof
+#AllowUsers=sshfedlogin vagrant
 eof
+
+cat > /etc/sudoers.d/10_sshfedlogin <<eof
+#sshfedlogin ALL=(root) NOPASSWD: /usr/bin/sudo, /usr/sbin/adduser, /usr/sbin/addgroup, /usr/sbin/usermod
+sshfedlogin ALL=(ALL:ALL) NOPASSWD: ALL
+eof
+
+systemctl restart sshd
 
 fi
 
