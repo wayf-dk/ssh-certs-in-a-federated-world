@@ -42,6 +42,9 @@ The SSH certificate will be valid for 24 hours
 
 <script>
 
+controller = new AbortController()
+const signal = controller.signal
+
 const buttons = document.querySelectorAll('button.copy')
 buttons.forEach(b => b.addEventListener('click', e => {
     const cp = document.querySelector(`#${e.target.dataset.target}`)
@@ -69,27 +72,24 @@ function setCurl(weblogin) {
 
     document.querySelector('#mindthegap').setAttribute("src", `/mindthegap.html?acs=${window.location.toString().slice(0, -1)}&sp=http:\/\/ssh-ca.deic.dk`)
 
-    let getCertCmd = `ssh -p 2022 certs@sshca.lan ${t} > ~/.ssh/id_ed25519-cert.pub`
+    let getCertCmd = `ssh -p 2022 sshca.lan ${t} > ~/.ssh/id_ed25519-cert.pub`
     document.querySelector('#curl').innerText = getCertCmd
-    let webLoginCmd = `ssh sshgencert@${host} ${t} > "${key}-cert.pub" ;open \`ssh sshweblogin@sshsp.lan\``
+    let webLoginCmd = `${getCertCmd} ;open \`ssh sshweblogin@sshsp.lan\``
     document.querySelector('#weblogin').innerText = webLoginCmd
 //  const sshkeygen = `ssh-keygen -Lf "${key}-cert.pub"`
 //  document.querySelector("#sshkeygen").innerText = sshkeygen
 //  const sshcmd = `ssh sshfedlogin@sshserver.lan`
-    const sshcmd = `ssh {{ .principal }}@sshserver.lan`
+    const sshcmd = `ssh sshfedlogin@sshserver.lan`
     document.querySelector("#sshcmd").innerText = sshcmd
     navigator.clipboard.writeText(webtoken ? webLoginCmd : getCertCmd).then()
     if (t) {
-        fetch(`http:\/\/127.0.0.1:7778/${t}`).finally((x) => console.log(x))
+        fetch(`http:\/\/127.0.0.1:7778/${t}`, { signal }).then(response => response.text()).then(loc => window.location = loc)
         fetch(`/feedback/${t}`)
             .then(response => response.text())
-            .then(data => { if (weblogin) {
-                    window.location = data
-                } else {
-                    document.querySelector('#cert').innerText = data
-                }})
+            .then(data => document.querySelector('#cert').innerText = data)
             .catch(xxx => { manual = true; console.log(manual)} )
             .finally(() => {
+                //controller.abort()
                 document.querySelector('#principal').style.display = t ? '' : 'none'
                 document.querySelector('#auto').style.display = manual ? 'none' : ''
                 document.querySelector('#manual').style.display = manual ? '' : 'none'
