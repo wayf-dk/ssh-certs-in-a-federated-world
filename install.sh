@@ -44,8 +44,7 @@ cat > /etc/ssh/sshd_config.d/sshfedlogin.conf <<eof
 eof
 
 cat > /etc/sudoers.d/10_sshfedlogin <<eof
-#sshfedlogin ALL=(root) NOPASSWD: /usr/bin/sudo, /usr/sbin/adduser, /usr/sbin/addgroup, /usr/sbin/usermod
-sshfedlogin ALL=(ALL:ALL) NOPASSWD: ALL
+sshfedlogin ALL=(root) NOPASSWD: /usr/bin/su, /usr/sbin/adduser, /usr/sbin/addgroup, /usr/sbin/usermod
 eof
 
 systemctl restart sshd
@@ -58,6 +57,8 @@ then
 
 cp go/sshwebloginshell /usr/local/bin/sshwebloginshell
 touch /home/sshweblogin/.hushlogin
+mkdir -p /var/run/sshweblogin
+chown sshweblogin:www-data /var/run/sshweblogin
 
 fi
 
