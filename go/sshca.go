@@ -48,8 +48,9 @@ var (
 	//go:embed assets/ca.key
 	privateKey []byte
 
-	eppnRegexp = regexp.MustCompile(`[^-a-zA-Z0-9]`)
-	tmpl       *template.Template
+	eppnRegexp  = regexp.MustCompile(`[^-a-zA-Z0-9]`)
+	tokenRegexp = regexp.MustCompile(`[0-9a-f]+`)
+	tmpl        *template.Template
 
 	done chan bool
 	//	claims = &bucket{}
@@ -122,7 +123,6 @@ func caHandler(w http.ResponseWriter, r *http.Request) {
 func feedbackHandler(w http.ResponseWriter, r *http.Request) {
 	token := strings.TrimPrefix(r.URL.Path, "/feedback/")
 	resp := claims.wait(token)
-	fmt.Println(token, resp)
 	io.WriteString(w, resp)
 }
 
@@ -287,22 +287,43 @@ func sshserver() {
 				log.Fatalf("Could not accept channel: %v", err)
 			}
 
+			var token string
+		reqLoop:
 			for req := range reqs {
-				if req.Type == "exec" {
-					token := string(req.Payload[4:])
-					if data, ok := claims.get(token); ok { // string with 32 bits length prefix
+				fmt.Println(req)
+				switch req.Type {
+				case "shell":
+					break reqLoop
+				case "exec":
+					token = tokenRegexp.FindString(string(req.Payload[4:])) // string with 32 bits length prefix
+					fmt.Println(token)
+					if data, ok := claims.get(token); ok {
 						cert := newCertificate(data)
 						s, _ := json.MarshalIndent(cert, "", "    ")
 						claims.meet(token, string(s))
 						certTxt := string(ssh.MarshalAuthorizedKey(cert))
 						io.WriteString(channel, fmt.Sprintf("%s", certTxt))
 					}
-					break
+					break reqLoop
+				}
+			}
+			if token == "" {
+				buf := make([]byte, 1024)
+				channel.Read(buf)
+				token = string(tokenRegexp.Find(buf))
+
+				if data, ok := claims.get(token); ok {
+					cert := newCertificate(data)
+					s, _ := json.MarshalIndent(cert, "", "    ")
+					claims.meet(token, string(s))
+					certTxt := string(ssh.MarshalAuthorizedKey(cert))
+					io.WriteString(channel, fmt.Sprintf("%s", certTxt))
 				}
 			}
 			channel.Close()
 		}
 		conn.Close()
+		fmt.Println("out of loop")
 	}
 }
 
@@ -321,7 +342,7 @@ func newCertificate(data string) (cert *ssh.Certificate) {
 			Extensions:      map[string]string{"permit-agent-forwarding": "", "permit-pty": "", "groups@wayf.dk": string(data)},
 		},
 		KeyId:           principal,
-		ValidPrincipals: []string{principal, "sshfedlogin"},
+		ValidPrincipals: []string{principal, "sshfedlogin", "sshweblogin"},
 		ValidAfter:      uint64(time.Now().Unix() - 60),
 		ValidBefore:     uint64(time.Now().Unix() + 36*3600),
 	}
@@ -430,7 +451,7 @@ func (rv *rendezvous) wait(token string) (data string) {
 	if ok {
 		select {
 		case data = <-c:
-		case <-time.After(10 * time.Second):
+		case <-time.After(30 * time.Second):
 		}
 	}
 	rv.mx.Lock()
