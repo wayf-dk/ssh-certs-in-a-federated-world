@@ -10,12 +10,8 @@
 <section class=ssh>
 <H2>DeiC SSH Certificate Authority POC</h2>
 <p>The DEiC SSH Certificate Authority creates SSH certificates based on a federated login.
-</section>
-<section>
-<iframe id=mindthegap frameborder="0" src="/mindthegap.html?acs=1&sp=http://ssh-ca.deic.dk" style="width: 350px; height: 100px;"></iframe>
-</section>
-<section id=principal>
-<p>Hello <em>{{ .principal }}</em>
+<p id=principal>Hello <em>{{ .principal }}</em>
+<p><iframe id=mindthegap frameborder="0" src="/mindthegap.html?acs=1&sp=http://ssh-ca.deic.dk" style="width: 350px; height: 100px;"></iframe>
 </section>
 <section id=manual>
 
@@ -41,9 +37,6 @@ The SSH certificate will be valid for 24 hours
 </section>
 
 <script>
-
-controller = new AbortController()
-const signal = controller.signal
 
 const buttons = document.querySelectorAll('button.copy')
 buttons.forEach(b => b.addEventListener('click', e => {
@@ -74,22 +67,19 @@ function setCurl(weblogin) {
 
     let getCertCmd = `ssh -p 2022 sshca.lan ${t} > ~/.ssh/id_ed25519-cert.pub`
     document.querySelector('#curl').innerText = getCertCmd
-    let webLoginCmd = `${getCertCmd} ;open \`ssh sshweblogin@sshsp.lan\``
+    let webLoginCmd = `${getCertCmd} ;open \`ssh -T sshweblogin@sshsp.lan\``
     document.querySelector('#weblogin').innerText = webLoginCmd
-//  const sshkeygen = `ssh-keygen -Lf "${key}-cert.pub"`
-//  document.querySelector("#sshkeygen").innerText = sshkeygen
-//  const sshcmd = `ssh sshfedlogin@sshserver.lan`
     const sshcmd = `ssh sshfedlogin@sshserver.lan`
     document.querySelector("#sshcmd").innerText = sshcmd
     navigator.clipboard.writeText(webtoken ? webLoginCmd : getCertCmd).then()
     if (t) {
-        fetch(`http:\/\/127.0.0.1:7778/${t}`, { signal }).then(response => response.text()).then(loc => window.location = loc)
+        fetch(`http:\/\/127.0.0.1:7778/${t}`, { signal: AbortSignal.timeout(1000) }).then(response => response.text()).then(loc => window.location = loc)
         fetch(`/feedback/${t}`)
             .then(response => response.text())
             .then(data => document.querySelector('#cert').innerText = data)
-            .catch(xxx => { manual = true; console.log(manual)} )
+            .catch(xxx => { manual = true } )
             .finally(() => {
-                //controller.abort()
+                //controller.timeout(1000)
                 document.querySelector('#principal').style.display = t ? '' : 'none'
                 document.querySelector('#auto').style.display = manual ? 'none' : ''
                 document.querySelector('#manual').style.display = manual ? '' : 'none'
