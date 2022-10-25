@@ -28,7 +28,6 @@ func sshfedloginshell() {
 	cert, err := unmarshalCert([]byte(certTxt))
 	updateUserAndGroups(cert)
 	args := append([]string{"sudo", "/bin/su", "--login", cert.KeyId}, os.Args[1:]...)
-	fmt.Println(os.Args, args)
 	syscall.Exec("/usr/bin/sudo", args, os.Environ())
 }
 

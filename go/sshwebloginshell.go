@@ -6,11 +6,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"regexp"
-)
-
-var (
-	eppnRegexp = regexp.MustCompile(`[^-a-zA-Z0-9]`)
 )
 
 func main() {
@@ -18,17 +13,22 @@ func main() {
 }
 
 func sshweblogin() {
-	fn, err := os.CreateTemp("/var/run/sshweblogin", "")
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	certTxt, err := os.ReadFile(os.Getenv("SSH_USER_AUTH"))
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	cert, err := unmarshalCert([]byte(certTxt))
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	data := cert.Extensions["groups@wayf.dk"]
+
+	fn, err := os.CreateTemp("/var/run/sshweblogin", "")
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	if _, err := fn.Write([]byte(data)); err != nil {
 		log.Fatal(err)
