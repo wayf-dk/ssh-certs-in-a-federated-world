@@ -1,7 +1,11 @@
 #!/usr/bin/sh
 
-if [ "$1" = "CA" ]
-then
+
+for module in "$@"
+do
+
+case $role in
+CA)
 systemctl stop sshca
 cp go/sshca /usr/local/bin/sshca
 
@@ -14,11 +18,9 @@ ExecStart=/usr/local/bin/sshca
 eof
 
 systemctl start sshca
+;;
 
-fi
-
-if [ "$1" = "sshserver" ]
-then
+sshserver)
 cat > /etc/ssh/sshd_config.d/certs.conf <<eof
 TrustedUserCAKeys /etc/ssh/sshd_config.d/ca-keys.pub
 ExposeAuthInfo yes
@@ -30,11 +32,9 @@ ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJoDNr0ec0yRaDdr7NhQtJkaNNPF+QQkeINOFYlPaT0b
 eof
 
 systemctl restart sshd
+;;
 
-fi
-
-if [ "$1" = "sshfedlogin" ]
-then
+sshfedlogin)
 cp go/sshfedloginshell /usr/local/bin/sshfedloginshell
 
 /usr/sbin/adduser -gecos "" --disabled-password --shell /usr/local/bin/sshfedloginshell sshfedlogin
@@ -48,17 +48,20 @@ sshfedlogin ALL=(root) NOPASSWD: /usr/bin/su, /usr/sbin/adduser, /usr/sbin/addgr
 eof
 
 systemctl restart sshd
+;;
 
-fi
-
-if [ "$1" = "sshweblogin" ]
-then
+sshweblogin)
 /usr/sbin/adduser -gecos "" --disabled-password --shell /usr/local/bin/sshwebloginshell sshweblogin
 
 cp go/sshwebloginshell /usr/local/bin/sshwebloginshell
 touch /home/sshweblogin/.hushlogin
 mkdir -p /var/run/sshweblogin
 chown sshweblogin:www-data /var/run/sshweblogin
+;;
 
-fi
+*)
 
+echo "unknown module $role"
+;;
+esac
+done
