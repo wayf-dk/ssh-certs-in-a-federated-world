@@ -4,7 +4,7 @@
 for module in "$@"
 do
 
-case $role in
+case $module in
 CA)
 systemctl stop sshca
 cp go/sshca /usr/local/bin/sshca
@@ -61,7 +61,7 @@ chown sshweblogin:www-data /var/run/sshweblogin
 
 *)
 
-echo "unknown module $role"
+echo "unknown module $module"
 ;;
 esac
 done
