@@ -21,7 +21,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -240,12 +239,7 @@ func sshserver() {
 		},
 	}
 
-	privateBytes, err := os.ReadFile("/etc/ssh/ssh_host_ed25519_key")
-	if err != nil {
-		log.Fatal("Failed to load private key: ", err)
-	}
-
-	private, err := ssh.ParsePrivateKey(privateBytes)
+	private, err := ssh.ParsePrivateKey(privateKey)
 	if err != nil {
 		log.Fatal("Failed to parse private key: ", err)
 	}
