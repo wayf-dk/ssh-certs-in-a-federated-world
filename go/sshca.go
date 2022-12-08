@@ -83,7 +83,7 @@ func caHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	v := r.Form
 
-	host := r.Header["X-Forwarded-Host"][0]
+	host := r.Host
 
 	showForm := (host == "sshsp.lan" || v.Get("idplist") == "") && !v.Has("SAMLResponse")
 
