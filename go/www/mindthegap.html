@@ -139,37 +139,14 @@
 
        if (entityID) { // back from ds - save selected idp
            localStorage[localStorageKey] = JSON.stringify({idp: entityID}) // we can't set the displaynames here - don't want to wait for mdq response
-           sendSAMLRequest()
+           sendRequest()
        }
 
-        function sendSAMLRequest() {
- 	        const IssueInstant = new Date().toISOString().slice(0,-5)+"Z"
- 	        let array = new Uint8Array(21)
- 	        window.crypto.getRandomValues(array)
-	        const ID = "_"+btoa(String.fromCharCode(...array)).replace(/\+/g, '-').replace(/\//g, '_')
-            const theACS = /^\d+$/.test(acs) ?  `AssertionConsumerServiceIndex="${acs}"`: `AssertionConsumerServiceURL="${acs}"`
-    	    let SAMLRequest = `<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
-xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
-Version="2.0"
-ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
-ID="${ID}"
-IssueInstant="${IssueInstant}"
-Destination="https://wayf.wayf.dk/saml2/idp/SSOService2.php"
-${theACS}
->
-<saml:Issuer>${sp}</saml:Issuer>
-<samlp:NameIDPolicy Format="urn:oasis:names:tc:SAML:2.0:nameid-format:transient" AllowCreate="true" />
-</samlp:AuthnRequest>
-`
-        document.getElementById('form').innerHTML = `<form id=request method=post action="https://wayf.wayf.dk/saml2/idp/SSOService2.php?idpentityid=${entityID}" target=_top>
-<input type=hidden id=samlrequest name=SAMLRequest value="${btoa(SAMLRequest)}">
-${relayState}
-</form>`
-            document.getElementById("request").submit();
-            return true
-        }
+       function sendRequest() {
+           window.top.location = `/ca/?idpentityid=${entityID}`
+       }
 </script>
-	<a id=idpanchor target=_top onClick="return sendSAMLRequest();">
+	<a id=idpanchor target=_top onClick="return sendRequest();">
 	<div class="ra21CTAcontainer ra21-button" role="button" data-href="" id="idpbutton">
 		<div class="identityprovider ra21CTAiconButton ra21CTAbutton ra21-button-logo-wrap">
 			<img class="ra21CTAicon ra21-button-logo" src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPCEtLSBHZW5lcmF0b3I6IEFkb2JlIElsbHVzdHJhdG9yIDIzLjAuMiwgU1ZHIEV4cG9ydCBQbHVnLUluIC4gU1ZHIFZlcnNpb246IDYuMDAgQnVpbGQgMCkgIC0tPgo8c3ZnIHZlcnNpb249IjEuMSIgaWQ9IkxheWVyXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IgoJIHZpZXdCb3g9IjAgMCAyNTMuODggMjUzLjk5IiBzdHlsZT0iZW5hYmxlLWJhY2tncm91bmQ6bmV3IDAgMCAyNTMuODggMjUzLjk5OyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+CjxzdHlsZSB0eXBlPSJ0ZXh0L2NzcyI+Cgkuc3Qwe2ZpbGw6I0ZGRkZGRjt9Cjwvc3R5bGU+CjxnPgoJPHBhdGggY2xhc3M9InN0MCIgZD0iTTM3LjU4LDk3Ljc2aDE3OC43M2M1LjcsMCwxMC42OC0zLjU2LDEyLjQ2LTguOWMxLjQyLTUuMzQtMC4zNi0xMS4wNC00Ljk5LTE0LjI0bC04OS4zNy02NC4wOQoJCWMtNC42My0zLjItMTAuNjgtMy4yLTE0Ljk1LDBMMzAuMTEsNzQuNjFjLTMuMiwyLjQ5LTUuMzQsNi4wNS01LjM0LDEwLjMzQzI0Ljc3LDkyLjA2LDMwLjQ2LDk3Ljc2LDM3LjU4LDk3Ljc2eiBNMTI2Ljk1LDM2Ljg3CgkJbDQ5LjQ5LDM1LjI1SDc3LjQ2TDEyNi45NSwzNi44N3oiLz4KCTxwb2x5Z29uIGNsYXNzPSJzdDAiIHBvaW50cz0iMTA5LjQ1LDE4NS40IDEwOS44NSwxMjcuODIgODAuMjUsMTEzLjU1IDgwLjI1LDE5OS42NyAJIi8+Cgk8cG9seWdvbiBjbGFzcz0ic3QwIiBwb2ludHM9IjE3NC4xOSwxOTkuMjYgMTc0LjE5LDExNC4zNyAxNDQuOTksMTI4LjY0IDE0NC45OSwxODYuMjEgCSIvPgoJPHBhdGggY2xhc3M9InN0MCIgZD0iTTI0Mi4wNywyMjYuNDJjLTAuMDEsMC0wLjAzLDAtMC4wNCwwaC0xMC43NXYtMTAuNzRjMC0zLjcxLTMuMDEtNi43Mi02LjcyLTYuNzJsLTEwLjEsMHYtODYuMjEKCQljMC04LjItNi43MS0xNC45LTE0LjktMTQuOWMtOC4yLDAtMTQuOSw2LjcxLTE0LjksMTQuOXY4Ni4yMWwtMTE1LjQyLTAuMDJ2LTg2LjE5YzAtOC4yLTYuNzEtMTQuOS0xNC45LTE0LjkKCQljLTguMiwwLTE0LjksNi43MS0xNC45LDE0Ljl2ODYuMThsLTEwLjA4LDBjLTMuNzEsMC02LjcyLDMuMDEtNi43Miw2LjcydjEwLjc0SDExLjg2Yy0zLjcxLDAtNi43MiwzLjAxLTYuNzIsNi43MnYxMS42OGgyNDMuNjIKCQl2LTExLjYzQzI0OC43NywyMjkuNDUsMjQ1Ljc4LDIyNi40MywyNDIuMDcsMjI2LjQyeiIvPgo8L2c+Cjwvc3ZnPgo=">
