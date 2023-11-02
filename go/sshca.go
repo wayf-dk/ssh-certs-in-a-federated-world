@@ -168,33 +168,26 @@ func sshserver() {
 				fmt.Println(req)
 				switch req.Type {
 				case "shell":
+				    buf := make([]byte, 1024)
+				    channel.Read(buf)
+				    PP(buf)
+				    token = string(tokenRegexp.Find(buf))
 					break reqLoop
 				case "exec":
 					token = tokenRegexp.FindString(string(req.Payload[4:])) // string with 32 bits length prefix
-					fmt.Println(token)
-					if data, ok := claims.get(token); ok {
-						cert := newCertificate(data)
-						s, _ := json.MarshalIndent(cert, "", "    ")
-						claims.meet(token, string(s))
-						certTxt := string(ssh.MarshalAuthorizedKey(cert))
-						io.WriteString(channel, fmt.Sprintf("%s", certTxt))
-					}
 					break reqLoop
 				}
 			}
-			if token == "" {
-				buf := make([]byte, 1024)
-				channel.Read(buf)
-				token = string(tokenRegexp.Find(buf))
 
-				if data, ok := claims.get(token); ok {
-					cert := newCertificate(data)
-					s, _ := json.MarshalIndent(cert, "", "    ")
-					claims.meet(token, string(s))
-					certTxt := string(ssh.MarshalAuthorizedKey(cert))
-					io.WriteString(channel, fmt.Sprintf("%s", certTxt))
-				}
-			}
+            if data, ok := claims.get(token); ok {
+                PP(token, data, ok)
+                cert := newCertificate(data)
+                s, _ := json.MarshalIndent(cert, "", "    ")
+                claims.meet(token, string(s))
+                certTxt := string(ssh.MarshalAuthorizedKey(cert))
+      			keyName := clientPubKey.Type()[4:]
+                io.WriteString(channel, fmt.Sprintf("%s%s\n", certTxt, keyName))
+            }
 			channel.Close()
 		}
 		conn.Close()
