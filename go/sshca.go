@@ -88,16 +88,16 @@ func feedbackHandler(w http.ResponseWriter, r *http.Request) {
 	token := strings.TrimPrefix(r.URL.Path, "/feedback/")
 	resp := claims.wait(token)
 	cert := map[string]any{}
-	err := json.Unmarshal([]byte(resp), &cert)
-	if (err != nil) {
-	    io.WriteString(w, resp);
-	    return;
+	// for now we ignore the error that parts of the Key field kan be far longer than an float64 - that is the format all json numbers is unmarshaled in to
+	json.Unmarshal([]byte(resp), &cert)
+    if _, ok := cert["KeyId"]; ok {
+        const iso = "2006-01-02T15:04:05"
+        va := time.Unix(int64(cert["ValidAfter"].(float64)), 0).Format(iso)
+        vb := time.Unix(int64(cert["ValidBefore"].(float64)), 0).Format(iso)
+        hours := cert["ValidBefore"].(float64) - cert["ValidAfter"].(float64)
+        resp = fmt.Sprintf("Valid %.0f hours from %s to %s\n\n%s", hours/3600, va, vb, resp)
 	}
-
-	const iso = "2006-01-02T15:04:05"
-	va := time.Unix(int64(cert["ValidAfter"].(float64)), 0).Format(iso)
-	vb := time.Unix(int64(cert["ValidBefore"].(float64)), 0).Format(iso)
-	io.WriteString(w, fmt.Sprintf("Valid from %s to %s\n\n%s", va, vb, resp))
+    io.WriteString(w, resp)
 }
 
 var clientPubKey ssh.PublicKey
