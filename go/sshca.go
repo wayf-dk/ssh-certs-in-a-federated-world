@@ -208,7 +208,7 @@ func newCertificate(data string) (cert *ssh.Certificate) {
 			Extensions:      map[string]string{"permit-agent-forwarding": "", "permit-pty": ""},
 		},
 		KeyId:           principal,
-		ValidPrincipals: []string{principal},
+		ValidPrincipals: []string{principal, "cert-tester"},
 		ValidAfter:      uint64(time.Now().Unix() - 60),
 		ValidBefore:     uint64(time.Now().Unix() + 36*3600),
 	}
