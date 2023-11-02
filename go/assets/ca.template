@@ -46,11 +46,13 @@ setCurl()
 
 function setCurl() {
     const t = '{{ .token }}'
-    const host = window.location.hostname
-
-    let getCertCmd = `ssh -p 2022 ${host} ${t} > ~/.ssh/id_sshca.lan-cert.pub`
+    const host = "sshca.deic.dk" // window.location.hostname
+    const schacHomeOrganization = "dtu.dk" // '{{ .schacHomeOrganization }}'${array[@]:0:1}
+    let getCertCmd = `cert=(\`ssh ${host} ${t}\`); echo \$cert > ~/.ssh/id_\${cert[@]:2:1}-cert.pub`
+    //let getCertCmd = `ssh ${host} ${t} > ~/.ssh/${schacHomeOrganization}; head -1 .ssh/${schacHomeOrganization} > .ssh/id_"$(tail -1 .ssh/${schacHomeOrganization})"-cert.pub`
     document.querySelector('#curl').innerText = getCertCmd
-    navigator.clipboard.writeText(getCertCmd).then()
+    //navigator.clipboard.writeText(getCertCmd).then()
+
 
     if (t) {
         //fetch(`http:\/\/127.0.0.1:7778/${t}`, { signal: AbortSignal.timeout(1000) }).then(response => response.text()).then(loc => window.location = loc)
