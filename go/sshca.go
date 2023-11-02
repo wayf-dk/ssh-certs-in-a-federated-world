@@ -77,8 +77,10 @@ func caHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	principal = eppnRegexp.ReplaceAllString(principal, "_")
+	schacHomeOrganization := template.JS(r.Header.Get("Oidc_claim_schacHomeOrganization"))
 	token := claims.put(principal)
-	tmpl.Execute(w, map[string]any{"token": token, "principal": template.JS(principal)})
+	PP("home", schacHomeOrganization)
+	tmpl.Execute(w, map[string]any{"token": token, "principal": template.JS(principal), "schacHomeOrganization": schacHomeOrganization})
 	return
 }
 
