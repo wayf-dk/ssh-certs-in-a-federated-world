@@ -17,8 +17,7 @@
 
 <section id=manual>
 <h2>SSH login</h2>
-<p>The command below is already copied to your clipboard.
-Execute it in a shell to upload the public key and download the SSH certificate.
+<p>Copy the command below to your clipboard. Execute it in a shell to upload the public key and download the SSH certificate.
 <p><code id=curl></code> <button class=copy data-target=curl></button>
 </section>
 
