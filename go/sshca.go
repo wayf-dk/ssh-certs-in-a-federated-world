@@ -125,23 +125,27 @@ func sshserver() {
 
 	// Once a ServerConfig has been configured, connections can be
 	// accepted.
-	listener, err := net.Listen("tcp", "0.0.0.0:2022")
+	const listenOn = "0.0.0.0:22"
+	listener, err := net.Listen("tcp", listenOn)
 	if err != nil {
 		log.Fatal("failed to listen for connection: ", err)
 	}
-	fmt.Println("listening on 2022")
+	fmt.Println("listening on " + listenOn)
 
+	listen:
 	for {
 		nConn, err := listener.Accept()
 		if err != nil {
-			log.Fatal("failed to accept incoming connection: ", err)
+			log.Println("failed to accept incoming connection: ", err)
+			continue;
 		}
 
 		// Before use, a handshake must be performed on the incoming
 		// net.Conn.
 		conn, chans, reqs, err := ssh.NewServerConn(nConn, config)
 		if err != nil {
-			log.Fatal("failed to handshake: ", err)
+			log.Println("failed to handshake: ", err)
+			continue listen
 		}
 
 		// The incoming Request channel must be serviced.
@@ -150,12 +154,12 @@ func sshserver() {
 		for newChannel := range chans {
 			if newChannel.ChannelType() != "session" {
 				newChannel.Reject(ssh.UnknownChannelType, "unknown channel type")
-				continue
+				continue listen
 			}
 
 			channel, reqs, err := newChannel.Accept()
 			if err != nil {
-				log.Fatalf("Could not accept channel: %v", err)
+				log.Println("Could not accept channel: %v", err)
 			}
 
 			var token string
