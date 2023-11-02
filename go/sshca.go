@@ -108,6 +108,9 @@ func sshserver() {
 	config := &ssh.ServerConfig{
 		// Remove to disable public key auth.
 		PublicKeyCallback: func(c ssh.ConnMetadata, pubKey ssh.PublicKey) (*ssh.Permissions, error) {
+            if _, ok := pubKey.(*ssh.Certificate); ok {
+                pubKey = pubKey.(*ssh.Certificate).Key
+            }
 			clientPubKey = pubKey
 			return nil, nil
 		},
