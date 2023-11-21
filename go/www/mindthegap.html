@@ -121,7 +121,10 @@
 <body id="main" style="background-color: transparent; background-position: initial initial; background-repeat: initial initial;">
 <div id=form></div>
 <script>
-       let ds = sp => `https://wayf.wayf.dk/ds/?return=${encodeURIComponent(window.location)}&returnIDParam=entityID&entityID=${encodeURIComponent(sp)}`
+       var u = new URLSearchParams(window.location.search)
+       const token = u.get('token')
+
+       let ds = sp => `https://wayf.wayf.dk/ds/?return=${encodeURIComponent(window.location)}${token && "&token="+token}&returnIDParam=entityID&entityID=${encodeURIComponent(sp)}`
        let mdq = (ent, type) => `https://wayf.wayf.dk/MDQ/${encodeURIComponent(ent)}/${type}/${encodeURIComponent(ent)}`
        let localStorageKey = 'RA21IDP'
 
@@ -131,19 +134,17 @@
            anotherinst: { en: 'Access through another institution', da: 'Login via en anden institution' },
        }
 
-       var u = new URLSearchParams(window.location.search)
        var sp = u.get('sp')
        var acs = u.get('acs') ?? "0"
        var entityID = u.get('entityID')
        var relayState = u.get('RelayState') ? `<input type=hidden value=${u.get('RelayState')} name=RelayState>` : ''
-
        if (entityID) { // back from ds - save selected idp
            localStorage[localStorageKey] = JSON.stringify({idp: entityID}) // we can't set the displaynames here - don't want to wait for mdq response
            sendRequest()
        }
 
        function sendRequest() {
-           window.top.location = `/ca/?idpentityid=${entityID}`
+           window.top.location = `/?idpentityid=${entityID}&token=${token}`
        }
 </script>
 	<a id=idpanchor target=_top onClick="return sendRequest();">

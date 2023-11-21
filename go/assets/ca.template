@@ -12,7 +12,8 @@
 <H2>DeiC SSH Certificate Authority POC</h2>
 <p>The DEiC SSH Certificate Authority creates SSH certificates based on a federated login.
 <p id=principal>Hello <em>{{ .principal }}</em>
-<p><iframe id=mindthegap frameborder="0" src="/www/mindthegap.html?acs=2&sp=http://ssh-ca.deic.dk" style="width: 350px; height: 100px;"></iframe>
+<p><iframe id=mindthegap frameborder="0" src="/www/mindthegap.html?acs=2&sp=http://ssh-ca.deic.dk&token={{ .token }}" style="width: 350px; height: 100px;"></iframe>
+<p><a href="/d">MyAccessID</a>
 </section>
 
 <section id=manual>
@@ -42,21 +43,21 @@ buttons.forEach(b => b.addEventListener('click', e => {
 })
 )
 
+
+
+myAccessIDWindow = '{{ .verification_uri }}' && window.open('{{ .verification_uri }}', '_blank')
+
 setCurl()
 
 function setCurl() {
-    const t = '{{ .token }}'
-    const host = "sshca.deic.dk" // window.location.hostname
-    const schacHomeOrganization = "dtu.dk" // '{{ .schacHomeOrganization }}'${array[@]:0:1}
-    let getCertCmd = `cert=(\`ssh ${host} ${t}\`); echo \$cert > ~/.ssh/id_\${cert[@]:2:1}-cert.pub`
-    //let getCertCmd = `ssh ${host} ${t} > ~/.ssh/${schacHomeOrganization}; head -1 .ssh/${schacHomeOrganization} > .ssh/id_"$(tail -1 .ssh/${schacHomeOrganization})"-cert.pub`
-    document.querySelector('#curl').innerText = getCertCmd
-    //navigator.clipboard.writeText(getCertCmd).then()
-
+    const t = '{{ .state }}'
 
     if (t) {
-        fetch(`http:\/\/127.0.0.1:7778/${t}`, { signal: AbortSignal.timeout(1) }).catch(t => t)
-        fetch(`/feedback/${t}`)
+        const host = window.location.hostname
+        const getCertCmd = `ssh ${host} ${t} | (read -r cert; read -r type; echo $cert > ~/.ssh/id_$type-cert.pub)`
+        document.querySelector('#curl').innerText = getCertCmd
+        //navigator.clipboard.writeText(getCertCmd).then()
+        fetch(`/feedback/${t}_zzz`)
             .then(response => response.text())
             .then(data => document.querySelector('#cert').innerText = data)
             .catch(xxx => { manual = true } )

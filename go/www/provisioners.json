@@ -1,0 +1,16 @@
+{"provisioners":[
+  {"type":"OIDC",
+     "name":"MyAccessIDAcc",
+     "clientID":"APP-69C9BE38-B37C-429F-8C8F-4E20CF99BCA6",
+     "configurationEndpoint":"https://webapp.acc.myaccessid.org/oidc/.well-known/openid-configuration",
+     "domains":["geant.org","acc.myaccessid.org","ut.ee"],
+     "claims":{
+       "minUserSSHCertDuration":"5m0s",
+       "maxUserSSHCertDuration":"1h0m0s",
+       "defaultUserSSHCertDuration":"10m0s",
+       "enableSSHCA":true,
+       "disableRenewal":false,
+       "allowRenewalAfterExpiry":false
+     },"options":{"x509":{},"ssh":{"templateFile":"templates/ssh/myaccessid.tpl"}}
+    }
+],"nextCursor":""}

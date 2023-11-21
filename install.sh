@@ -21,14 +21,17 @@ systemctl start sshca
 ;;
 
 sshserver)
+
+
 cat > /etc/ssh/sshd_config.d/certs.conf <<eof
 TrustedUserCAKeys /etc/ssh/sshd_config.d/ca-keys.pub
+AuthorizedPrincipalsFile /etc/ssh/sshd_config.d/principals_%u
 ExposeAuthInfo yes
 #AuthorizedKeysFile none
 eof
 
 cat > /etc/ssh/sshd_config.d/ca-keys.pub <<eof
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJoDNr0ec0yRaDdr7NhQtJkaNNPF+QQkeINOFYlPaT0b
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJHbiNzbLVnqSOyCpaDnjBpNTKAS8PHBLhTeQtxCnMdu mz@service
 eof
 
 systemctl restart sshd
