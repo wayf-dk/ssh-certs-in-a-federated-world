@@ -31,7 +31,13 @@ ExposeAuthInfo yes
 eof
 
 cat > /etc/ssh/sshd_config.d/ca-keys.pub <<eof
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJHbiNzbLVnqSOyCpaDnjBpNTKAS8PHBLhTeQtxCnMdu mz@service
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJHbiNzbLVnqSOyCpaDnjBpNTKAS8PHBLhTeQtxCnMdu
+eof
+
+
+cat > /etc/ssh/sshd_config.d/principals_mz <<eof
+madpe@dtu.dk
+gikcaswid@orphanage.wayf.dk
 eof
 
 systemctl restart sshd
