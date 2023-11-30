@@ -39,6 +39,8 @@ const (
     MyAccessIDAcc = "MyAccessIDAcc"
     clientID = "APP-69C9BE38-B37C-429F-8C8F-4E20CF99BCA6"
     verification_uri_template = "https://sshca.deic.dk/%s\n"
+    MyAccessIDTTL = 15*60
+    SSHCATTL = 36*3600
 )
 
 var (
@@ -174,6 +176,7 @@ func sshsignHandler(w http.ResponseWriter, r *http.Request) {
   	publicKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(params["PublicKey"]))
 	resp := post2(params["OTT"], op.Userinfo)
     sshCertificate := newCertificate(publicKey, resp)
+    sshCertificate := newCertificate(publicKey, resp, MyAccessIDTTL)
     res := ssh.MarshalAuthorizedKey(sshCertificate)
     w.Write(res)
     return
@@ -288,7 +291,7 @@ func handleSSHConnection(nConn net.Conn, config *ssh.ServerConfig) {
                 if ok && data != "NOT" {
                     res := map[string]any{}
                   	json.Unmarshal([]byte(data), &res)
-                    cert := newCertificate(pubkey, res)
+                    cert := newCertificate(pubkey, res, SSHCATTL)
                     s, _ := json.MarshalIndent(cert, "", "    ")
                     PP("cert", s)
                     if tt != device {
@@ -306,7 +309,7 @@ func handleSSHConnection(nConn net.Conn, config *ssh.ServerConfig) {
     fmt.Println("out of loop")
 }
 
-func newCertificate(pubkey ssh.PublicKey, claims map[string]any) (cert *ssh.Certificate) {
+func newCertificate(pubkey ssh.PublicKey, claims map[string]any, ttl int64) (cert *ssh.Certificate) {
     if _, ok := pubkey.(*ssh.Certificate); ok {
         pubkey = pubkey.(*ssh.Certificate).Key
     }
@@ -336,8 +339,8 @@ func newCertificate(pubkey ssh.PublicKey, claims map[string]any) (cert *ssh.Cert
 		},
 		KeyId:           principal,
 		ValidPrincipals: []string{principal, "cert-tester"},
-		ValidAfter:      uint64(now),
-		ValidBefore:     uint64(now + 36*3600),
+		ValidAfter:      uint64(now - 60),
+		ValidBefore:     uint64(now + ttl),
 	}
 	signer, err := ssh.ParsePrivateKey(privateKey)
 	if err != nil {
