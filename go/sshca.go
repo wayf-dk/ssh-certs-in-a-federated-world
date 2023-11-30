@@ -107,11 +107,16 @@ func caHandler(w http.ResponseWriter, r *http.Request) {
 		    tmpl.Execute(w, map[string]string{"state": token, "verification_uri": resp["verification_uri_complete"].(string)})
 		    go func(token string) {
                 resp, err := token_request(resp["device_code"].(string))
-                PP("device_code error", token, resp, err)
-                resp = post2(resp["access_token"].(string), op.Userinfo)
-                s, _ := json.Marshal(resp)
-                PP("user info", resp)
-                claims.meet(token, string(s))
+                if resp != nil {
+                    PP("device_code error", token, resp, err)
+                    resp, err = post2(resp["access_token"].(string), op.Userinfo)
+                    if err != nil {
+                        return
+                    }
+                    s, _ := json.Marshal(resp)
+                    PP("user info", resp)
+                    claims.meet(token, string(s))
+                }
             }(token)
 	        return
 	    }
@@ -174,8 +179,10 @@ func sshsignHandler(w http.ResponseWriter, r *http.Request) {
   	err := json.Unmarshal(req, &params)
   	fmt.Println(err, params)
   	publicKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(params["PublicKey"]))
-	resp := post2(params["OTT"], op.Userinfo)
-    sshCertificate := newCertificate(publicKey, resp)
+	resp, err := post2(params["OTT"], op.Userinfo)
+	if err != nil {
+	    return
+	}
     sshCertificate := newCertificate(publicKey, resp, MyAccessIDTTL)
     res := ssh.MarshalAuthorizedKey(sshCertificate)
     w.Write(res)
@@ -279,7 +286,10 @@ func handleSSHConnection(nConn net.Conn, config *ssh.ServerConfig) {
                     if resp == nil {
                         break
                     }
-	                resp = post2(resp["access_token"].(string), op.Userinfo)
+	                resp, err = post2(resp["access_token"].(string), op.Userinfo)
+	                if err != nil {
+	                    break
+	                }
                     s, _ := json.Marshal(resp)
                     PP("user info", resp)
                     token = claims.put("")
@@ -492,16 +502,22 @@ func token_request(device_code string) (res map[string]any, err error) {
             continue
         }
     }
-    return
+    return nil, errors.New("")
 }
 
-func post2(token, endpoint string) (res map[string]any) {
+func post2(token, endpoint string) (res map[string]any, err error) {
 	request, _ := http.NewRequest("POST", endpoint, nil)
 	request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Add("Authorization", "Bearer "+token)
-  	resp, _ := client.Do(request)
+  	resp, err := client.Do(request)
+  	if err != nil {
+  	    return
+  	}
 	defer resp.Body.Close()
-	responsebody, _ := ioutil.ReadAll(resp.Body)
+	responsebody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+	    return
+	}
     res = map[string]any{}
   	json.Unmarshal(responsebody, &res)
   	PP("post2", responsebody, res)
