@@ -263,7 +263,7 @@ func handleSSHConnection(nConn net.Conn, config *ssh.ServerConfig) {
         }
 
         for req := range reqs {
-            fmt.Println(req)
+            fmt.Println("reqs", req)
             switch req.Type {
             case "exec":
                 var tt tokenType
@@ -312,8 +312,13 @@ func handleSSHConnection(nConn net.Conn, config *ssh.ServerConfig) {
                     io.WriteString(channel, fmt.Sprintf("%s%s\n", certTxt, keyName)) // certTxt already have a linefeed at the end ..
                 }
                 channel.Close()
+            default:
+                if req.WantReply {
+                    req.Reply(false, nil)
+                }
             }
         }
+        channel.Close()
     }
     conn.Close()
     fmt.Println("out of loop")
