@@ -14,8 +14,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os/exec"
-	"regexp"
+//	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -46,6 +45,7 @@ const (
     verification_uri_template = "https://sshca.deic.dk/%s\n"
     MyAccessIDTTL = 15*60
     SSHCATTL = 36*3600
+    rendevouzTTL = 30
 )
 
 var (
@@ -58,12 +58,10 @@ var (
 	//go:embed assets/ca.key
 	privateKey []byte
 
-	eppnRegexp  = regexp.MustCompile(`[^-a-zA-Z0-9]`)
 	tmpl        *template.Template
-
 	done chan bool
 	claims = &rendezvous{channels: map[string](chan string){}, xtras: map[string]string{}}
-	publicKeys = &publicKeyMap{keys: map[string]ssh.PublicKey{}}
+	publicKeys = &publicKeyMap{info: map[string]sessionInfo{}}
     op = opconfig{}
     client = &http.Client{}
 )
@@ -102,7 +100,6 @@ func ca() {
 func caHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	principal := r.Header.Get("Oidc_claim_edupersonprincipalname")
-    PP("principal", principal, r.Method, r.Form)
 	if principal == "" { // show mindthegap
 	    path := append(strings.SplitN(r.URL.Path, "/", 3)[1:], "") // starts with / and idp might be empty
 	    if path[0] == "d" {
@@ -125,7 +122,6 @@ func caHandler(w http.ResponseWriter, r *http.Request) {
             }(token)
 	        return
 	    }
-	    PP("path", path, r.URL.Path)
 	    token := path[0]+r.Form.Get("token")
 	    idp, _ := claims.get(token)
 	    idp = idp+path[1]+r.Form.Get("idpentityid")
@@ -143,8 +139,6 @@ func caHandler(w http.ResponseWriter, r *http.Request) {
     	    return
 	    }
 	}
-	principal = eppnRegexp.ReplaceAllString(principal, "_")
-
 	data := map[string][]string{}
 	for claim, claims := range r.Header {
 	    if strings.HasPrefix(claim, "Oidc_claim_") {
@@ -152,7 +146,6 @@ func caHandler(w http.ResponseWriter, r *http.Request) {
 	    }
 	}
 	state := r.Form.Get("state") // when returning
-	fmt.Println("state", state)
     s, _ := json.Marshal(data)
 	claims.meet(state, string(s))
 	claims.set(state+"_zzz", "")
@@ -182,7 +175,6 @@ func sshsignHandler(w http.ResponseWriter, r *http.Request) {
     req, _ := io.ReadAll(r.Body)
 	params := map[string]string{}
   	err := json.Unmarshal(req, &params)
-  	fmt.Println(err, params)
   	publicKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(params["PublicKey"]))
 	resp, err := post2(params["OTT"], op.Userinfo)
 	if err != nil {
@@ -277,15 +269,15 @@ func handleSSHConnection(nConn net.Conn, config *ssh.ServerConfig) {
                 fmt.Println(token)
                 if token == "t" {
                     token = claims.put(idp)
-                    fmt.Println("t", verification_uri_template, token)
                     io.WriteString(channel, fmt.Sprintf(verification_uri_template, token))
                 } else if token == "d" {
                     tt = device
                     resp := device_authorization_request()
                     verification_uri_complete := resp["verification_uri_complete"].(string)
-                    qr, err := exec.Command(`/usr/bin/qrencode`, `-tUTF8`, verification_uri_complete).CombinedOutput()
-                    fmt.Println(err, string(qr))
-                    io.WriteString(channel, fmt.Sprintf("%s%s\n#\n", qr, verification_uri_complete ))
+                    //qr, err := exec.Command(`/usr/bin/qrencode`, `-tUTF8`, verification_uri_complete).CombinedOutput()
+                    //fmt.Println(err, string(qr))
+                    //io.WriteString(channel, fmt.Sprintf("%s%s\n#\n", qr, verification_uri_complete ))
+                    io.WriteString(channel, fmt.Sprintf("%s\n", verification_uri_complete ))
                     resp, err = token_request(resp["device_code"].(string))
                     PP("device_code error", resp, err)
                     if resp == nil {
@@ -335,8 +327,6 @@ func newCertificate(pubkey ssh.PublicKey, claims map[string]any, ttl int64) (cer
     }
   	PP("claims", claims)
     var principal string
-    val, ok := claims["edupersonprincipalname"].([]any)
-    PP("principal ...", val, ok)
     if val, ok := claims["edupersonprincipalname"].([]any); ok {
         principal = val[0].(string)
     } else if val, ok :=  claims["sub"].(string); ok {
@@ -346,8 +336,6 @@ func newCertificate(pubkey ssh.PublicKey, claims map[string]any, ttl int64) (cer
         return nil
     }
     PP("principal", principal)
-	// principal = eppnRegexp.ReplaceAllString(principal, "_")
-
     now := time.Now().In(time.FixedZone("UTC", 0)).Unix()
 	cert = &ssh.Certificate{
 		CertType: ssh.UserCert,
@@ -443,7 +431,7 @@ func (rv *rendezvous) wait(token string) (data string) {
 	if ok {
 		select {
 		case data = <-c:
-		case <-time.After(30 * time.Second):
+		case <-time.After(rendevouzTTL * time.Second):
 		}
 	}
 	rv.mx.Lock()
