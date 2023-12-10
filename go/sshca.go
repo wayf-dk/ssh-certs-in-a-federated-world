@@ -33,6 +33,11 @@ type (
         Device_authorization string `json:"device_authorization_endpoint"`
         Token string `json:"token_endpoint"`
     }
+
+    sessionInfo struct {
+        user string
+        publicKey ssh.PublicKey
+    }
 )
 
 const (
@@ -197,11 +202,11 @@ func sshserver() {
 	config := &ssh.ServerConfig{
 		// Remove to disable public key auth.
 		PublicKeyCallback: func(c ssh.ConnMetadata, pubKey ssh.PublicKey) (*ssh.Permissions, error) {
-		    fmt.Println("pubkey type", pubKey.Type())
+		    fmt.Println("pubkey type", pubKey.Type(), c.User())
 		    if !allowedKeyTypes[pubKey.Type()] {
 		        return nil, errors.New("xxx")
 		    }
-            publicKeys.set(string(c.SessionID()), pubKey)
+            publicKeys.set(string(c.SessionID()), sessionInfo{c.User(), pubKey})
 			return nil, nil // errors.New("xxx")
 		},
 	}
@@ -297,18 +302,18 @@ func handleSSHConnection(nConn net.Conn, config *ssh.ServerConfig) {
                 }
                 fmt.Println(token)
                 data := claims.wait(token)
-                pubkey, ok := publicKeys.get(string(conn.SessionID()))
+                si, ok := publicKeys.get(string(conn.SessionID()))
                 if ok && data != "NOT" {
                     res := map[string]any{}
                   	json.Unmarshal([]byte(data), &res)
-                    cert := newCertificate(pubkey, res, SSHCATTL)
+                    cert := newCertificate(si.publicKey, res, SSHCATTL)
                     s, _ := json.MarshalIndent(cert, "", "    ")
                     PP("cert", s)
                     if tt != device {
                         claims.meet(token+"_zzz", string(s))
                     }
                     certTxt := ssh.MarshalAuthorizedKey(cert)
-                    keyName := pubkey.Type()[4:]
+                    keyName := si.publicKey.Type()[4:]
                     io.WriteString(channel, fmt.Sprintf("%s%s\n", certTxt, keyName)) // certTxt already have a linefeed at the end ..
                 }
                 channel.Close()
@@ -452,22 +457,22 @@ func (rv *rendezvous) wait(token string) (data string) {
 
 type (
 	publicKeyMap struct {
-		keys map[string]ssh.PublicKey
+		info map[string]sessionInfo
 		mx  sync.RWMutex
 	}
 )
 
-func (pk *publicKeyMap) set(k string, v ssh.PublicKey) {
+func (pk *publicKeyMap) set(k string, v sessionInfo) {
 	pk.mx.Lock()
 	defer pk.mx.Unlock()
-	pk.keys[k] = v
+	pk.info[k] = v
 }
 
-func (pk *publicKeyMap) get(k string) (v ssh.PublicKey, ok bool) {
+func (pk *publicKeyMap) get(k string) (v sessionInfo, ok bool) {
 	pk.mx.Lock()
 	defer pk.mx.Unlock()
-	v, ok = pk.keys[k]
-	delete(pk.keys, k)
+	v, ok = pk.info[k]
+	delete(pk.info, k)
 	return
 }
 
