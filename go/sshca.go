@@ -89,6 +89,7 @@ func ca() {
 	httpMux.HandleFunc("/www/", fs.ServeHTTP)
 	httpMux.Handle("/favicon.ico", http.NotFoundHandler())
 	httpMux.HandleFunc("/feedback/", feedbackHandler)
+	httpMux.HandleFunc("/MyAccessID", myAccessIDHandler)
 	httpMux.HandleFunc("/ssh/sign", sshsignHandler)
 	httpMux.HandleFunc("/", caHandler)
 
@@ -97,31 +98,32 @@ func ca() {
 	fmt.Println("err: ", err)
 }
 
+func myAccessIDHandler(w http.ResponseWriter, r *http.Request) {
+    token := claims.put("")
+        claims.set(token+"_zzz", "")
+    resp := device_authorization_request()
+    tmpl.Execute(w, map[string]string{"state": token, "verification_uri": resp["verification_uri_complete"].(string)})
+    go func(token string) {
+        resp, err := token_request(resp["device_code"].(string))
+        if resp != nil {
+            PP("device_code error", token, resp, err)
+            resp, err = post2(resp["access_token"].(string), op.Userinfo)
+            if err != nil {
+                return
+            }
+            s, _ := json.Marshal(resp)
+            PP("user info", resp)
+            claims.meet(token, string(s))
+        }
+    }(token)
+    return
+}
+
 func caHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	principal := r.Header.Get("Oidc_claim_edupersonprincipalname")
 	if principal == "" { // show mindthegap
 	    path := append(strings.SplitN(r.URL.Path, "/", 3)[1:], "") // starts with / and idp might be empty
-	    if path[0] == "d" {
-            token := claims.put("")
-        	claims.set(token+"_zzz", "")
-            resp := device_authorization_request()
-		    tmpl.Execute(w, map[string]string{"state": token, "verification_uri": resp["verification_uri_complete"].(string)})
-		    go func(token string) {
-                resp, err := token_request(resp["device_code"].(string))
-                if resp != nil {
-                    PP("device_code error", token, resp, err)
-                    resp, err = post2(resp["access_token"].(string), op.Userinfo)
-                    if err != nil {
-                        return
-                    }
-                    s, _ := json.Marshal(resp)
-                    PP("user info", resp)
-                    claims.meet(token, string(s))
-                }
-            }(token)
-	        return
-	    }
 	    token := path[0]+r.Form.Get("token")
 	    idp, _ := claims.get(token)
 	    idp = idp+path[1]+r.Form.Get("idpentityid")
@@ -229,10 +231,6 @@ func sshserver() {
 }
 
 func handleSSHConnection(nConn net.Conn, config *ssh.ServerConfig) {
-	// An SSH server is represented by a ServerConfig, which holds
-	// certificate details and handles authentication of ServerConns.
-    // Before use, a handshake must be performed on the incoming
-    // net.Conn.
     type tokenType uint8
     const (
         normal tokenType = iota

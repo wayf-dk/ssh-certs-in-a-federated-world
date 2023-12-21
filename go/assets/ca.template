@@ -13,7 +13,7 @@
 <p>The DEiC SSH Certificate Authority creates SSH certificates based on a federated login.
 <p id=principal>Hello <em>{{ .principal }}</em>
 <p><iframe id=mindthegap frameborder="0" src="/www/mindthegap.html?acs=2&sp=http://ssh-ca.deic.dk&token={{ .token }}" style="width: 350px; height: 100px;"></iframe>
-<p><a href="/d">MyAccessID</a>
+<p><a href="/MyAccessID">MyAccessID</a>
 </section>
 
 <section id=manual>
